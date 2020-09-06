@@ -1,14 +1,10 @@
 import numpy as np
-import cv2 as cv
+import cv2
+
+Ai, Bi, cos = None, None, None
+x, y, w, h, center = None, None, None, None, None
 
 def cos_window(sz):
-    """
-    width, height = sz
-    j = np.arange(0, width)
-    i = np.arange(0, height)
-    J, I = np.meshgrid(j, i)
-    cos_window = np.sin(np.pi * J / width) * np.sin(np.pi * I / height)
-    """
     cos_window = np.hanning(int(sz[1]))[:, np.newaxis].dot(np.hanning(int(sz[0]))[np.newaxis, :])
     return cos_window
 
@@ -34,48 +30,74 @@ def rand_warp(img):
     center_warp = np.array([[w / 2], [h / 2]])
     tmp = np.sum(W[:, :2], axis=1).reshape((2, 1))
     W[:, 2:] = center_warp - center_warp * tmp
-    warped = cv.warpAffine(img, W, (w, h), cv.BORDER_REFLECT)
+    warped = cv2.warpAffine(img, W, (w, h), cv2.BORDER_REFLECT)
     return warped
 
-pos = [577, 124, 913, 535]
-x, y, w, h = pos[0], pos[1], pos[2]-pos[0], pos[3]-pos[1]
-center = (x+w/2, y+h/2)
-w, h = int(round(w)),int(round(h))
-cos = cos_window((w,h))
-sigma = 2.0
+def track_init(pos, frame):
+    global Ai, Bi, cos, x, y, w, h, center
+    sigma = 2.0
+    x, y, w, h = pos[0], pos[1], pos[2], pos[3]
+    center = (x+w/2, y+h/2)
+    w, h = int(round(w)), int(round(h))
+    cos = cos_window((w,h))
 
-gauss = gaussian2d_labels(w, h, sigma)
-G = np.fft.fft2(gauss)
-Ai=np.zeros_like(G)
-Bi=np.zeros_like(G)
+    gauss = gaussian2d_labels(w, h, sigma)
+    G = np.fft.fft2(gauss)
+    Ai = np.zeros_like(G)
+    Bi = np.zeros_like(G)
 
-# Load an color image in grayscale
-first = cv.imread('1.bmp', 0)
-img1 = first.astype(np.float32)/255
-fi = cv.getRectSubPix(img1, (w, h), center)
-cv.rectangle(first, (x, y), (x+w, y+h), (255, 0, 0))
-cv.imshow('image1', first)
+    # Load an color image in grayscale
+    img1 = frame.astype(np.float32)/255
+    fi = cv2.getRectSubPix(img1, (w, h), center)
 
-for _ in range(8):
-    fi = rand_warp(fi)
-    Fi=np.fft.fft2(preprocessing(fi, cos))
-    Ai += G * np.conj(Fi)
-    Bi += Fi * np.conj(Fi)
+    for _ in range(8):
+        fi = rand_warp(fi)
+        Fi = np.fft.fft2(preprocessing(fi, cos))
+        Ai += G * np.conj(Fi)
+        Bi += Fi * np.conj(Fi)
 
-second = cv.imread('2.bmp', 0)
-img2 = second.astype(np.float32)/255
-Hi = Ai/Bi
-fi = cv.getRectSubPix(img2, (w, h), center)
-fi = preprocessing(fi, cos)
-Gi = Hi * np.fft.fft2(fi)
-gi = np.real(np.fft.ifft2(Gi))
-curr = np.unravel_index(np.argmax(gi, axis=None), gi.shape)
-dy, dx = curr[0]-(h/2), curr[1]-(w/2)
-dy, dx = int(round(dy)), int(round(dx))
-x, y, w, h = x+dx, y+dy, w, h
+def track_update(frame):
+    global Ai, Bi, cos, x, y, w, h, center
+    img2 = frame.astype(np.float32)/255
+    Hi = Ai/Bi
+    fi = cv2.getRectSubPix(img2, (w, h), center)
+    fi = preprocessing(fi, cos)
+    Gi = Hi * np.fft.fft2(fi)
+    gi = np.real(np.fft.ifft2(Gi))
+    curr = np.unravel_index(np.argmax(gi, axis=None), gi.shape)
+    dy, dx = curr[0]-(h/2), curr[1]-(w/2)
+    dy, dx = int(round(dy)), int(round(dx))
+    bb = [x+dx, y+dy, w, h]
+    return bb
 
-cv.rectangle(second, (x, y), (x+w, y+h), (255, 0, 0))
-cv.imshow('image2', second)
-cv.waitKey(0)
+cap = cv2.VideoCapture('test.265')
+if not cap.isOpened():
+    print("ERROR: cannot open video file!")
+    exit()
+
+init_bb = None
+while True:
+    ret, frame = cap.read()
+    if ret ==  False:
+        break
+    frame_gray = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
+
+    if init_bb is None:
+        init_bb = cv2.selectROI("Frame", frame, fromCenter=False, showCrosshair=True)
+        track_init(init_bb, frame_gray)
+        x, y, w, h = init_bb[0], init_bb[1], init_bb[2], init_bb[3]
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+        print(init_bb)
+    else:
+        out_bb = track_update(frame_gray)
+        x, y, w, h = out_bb[0], out_bb[1], out_bb[2], out_bb[3]
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        print(out_bb)
+
+    cv2.imshow("Frame", frame)
+    key = cv2.waitKey(0) & 0xFF
+    if key == ord("q"):
+        break
+
 cv.destroyAllWindows()
 
