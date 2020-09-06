@@ -38,8 +38,7 @@ def track_init(pos, frame):
     sigma = 2.0
     x, y, w, h = pos[0], pos[1], pos[2], pos[3]
     center = (x+w/2, y+h/2)
-    w, h = int(round(w)), int(round(h))
-    cos = cos_window((w,h))
+    cos = cos_window((w, h))
 
     gauss = gaussian2d_labels(w, h, sigma)
     G = np.fft.fft2(gauss)
