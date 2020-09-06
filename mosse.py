@@ -1,8 +1,10 @@
 import numpy as np
 import cv2
 
-Ai, Bi, cos = None, None, None
+Ai, Bi, G, cos = None, None, None, None
 x, y, w, h, center = None, None, None, None, None
+sigma = 2.0
+interp_factor = 0.125
 
 def cos_window(sz):
     cos_window = np.hanning(int(sz[1]))[:, np.newaxis].dot(np.hanning(int(sz[0]))[np.newaxis, :])
@@ -34,8 +36,7 @@ def rand_warp(img):
     return warped
 
 def track_init(pos, frame):
-    global Ai, Bi, cos, x, y, w, h, center
-    sigma = 2.0
+    global Ai, Bi, G, cos, x, y, w, h, center
     x, y, w, h = pos[0], pos[1], pos[2], pos[3]
     center = (x+w/2, y+h/2)
     cos = cos_window((w, h))
@@ -47,16 +48,16 @@ def track_init(pos, frame):
 
     # Load an color image in grayscale
     img1 = frame.astype(np.float32)/255
-    fi = cv2.getRectSubPix(img1, (w, h), center)
+    f_rect = cv2.getRectSubPix(img1, (w, h), center)
 
     for _ in range(8):
-        fi = rand_warp(fi)
+        fi = rand_warp(f_rect)
         Fi = np.fft.fft2(preprocessing(fi, cos))
         Ai += G * np.conj(Fi)
         Bi += Fi * np.conj(Fi)
 
 def track_update(frame):
-    global Ai, Bi, cos, x, y, w, h, center
+    global Ai, Bi, G, cos, x, y, w, h, center
     img2 = frame.astype(np.float32)/255
     Hi = Ai/Bi
     fi = cv2.getRectSubPix(img2, (w, h), center)
@@ -64,9 +65,16 @@ def track_update(frame):
     Gi = Hi * np.fft.fft2(fi)
     gi = np.real(np.fft.ifft2(Gi))
     curr = np.unravel_index(np.argmax(gi, axis=None), gi.shape)
-    dy, dx = curr[0]-(h/2), curr[1]-(w/2)
-    dy, dx = int(round(dy)), int(round(dx))
+    dy, dx = int(round(curr[0]-(h/2))), int(round(curr[1]-(w/2)))
     bb = [x+dx, y+dy, w, h]
+    xc, yc = center
+    xc += dx
+    yc += dy
+    center = (xc, yc)
+    f_rect = cv2.getRectSubPix(img2, (w, h), center)
+    Fi = np.fft.fft2(preprocessing(f_rect, cos))
+    Ai = interp_factor * (G * np.conj(Fi)) + (1 - interp_factor) * Ai
+    Bi = interp_factor * (Fi * np.conj(Fi)) + (1 - interp_factor) * Bi
     return bb
 
 cap = cv2.VideoCapture('test.265')
@@ -98,5 +106,5 @@ while True:
     if key == ord("q"):
         break
 
-cv.destroyAllWindows()
+cv2.destroyAllWindows()
 
