@@ -1,0 +1,2 @@
+
+ffmpeg -i 20200901.mp4 -acodec copy -f segment -vcodec copy -reset_timestamps 1 -segment_time 1 -map 0 out.%d.mp4
