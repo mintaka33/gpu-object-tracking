@@ -81,7 +81,7 @@ void PerfUtil::stopTick(std::string tag)
 void PerfUtil::savePerfData()
 {
     printPerfSummary();
-    printPerfDetails();
+    //printPerfDetails();
 }
 
 void PerfUtil::printPerfSummary()

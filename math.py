@@ -12,15 +12,18 @@ def cos2d():
         for x in range(sz[0]):
             print('%f' % w[y][x], end=', ')
 
-w, h = 20, 10
-sigma = 2.0
-
-xs, ys = np.meshgrid(np.arange(w), np.arange(h))
-center_x, center_y = w / 2, h / 2
-dist = ((xs - center_x) ** 2 + (ys - center_y) ** 2) / (sigma**2)
-labels = np.exp(-0.5*dist)
-
-np.savetxt('dist.csv', dist, delimiter=',')
-np.savetxt('labels.csv', labels, delimiter=',')
+def guassian2d():
+    w, h = 20, 10
+    sigma = 2.0
+    
+    xs, ys = np.meshgrid(np.arange(w), np.arange(h))
+    center_x, center_y = w / 2, h / 2
+    dist = ((xs - center_x) ** 2 + (ys - center_y) ** 2) / (sigma**2)
+    labels = np.exp(-0.5*dist)
+    
+    np.savetxt('e:\\xs.csv', xs, delimiter=',')
+    np.savetxt('e:\\ys.csv', ys, delimiter=',')
+    np.savetxt('e:\\dist.csv', dist, delimiter=',')
+    np.savetxt('e:\\labels.csv', labels, delimiter=',')
 
 print('\ndone')
