@@ -1,23 +1,27 @@
 
-// https://numpy.org/doc/stable/reference/generated/numpy.hanning.html
-
+#include <string>
+#include <fstream>
 #include <iostream>
 #include <stdio.h>
 #include <math.h>
 
 #include "perf.h"
 
+using namespace std;
+
 #define PI 3.14159265
 
 PerfUtil pu;
 
-void print(double* data, const int w, const int h) {
+void dump2file(string filename, double* data, const int w, const int h) {
+    ofstream of(filename);
     for (size_t y = 0; y < h; y++) {
         for (size_t x = 0; x < w; x++) {
-            printf("%f, ", data[x + w * y]);
+            of << data[x + w * y] << ", ";
         }
-        printf("\n");
+        of << endl;
     }
+    of.close();
 }
 
 void hanning(const int m, double* d)  {
@@ -43,20 +47,21 @@ void cos2d(double* cos, const int w, const int h) {
 
 void guassian2d(double* guass, const int w, const int h) {
     const double sigma = 2.0;
+    double c = 1 / (2 * PI * sigma * sigma);
     for (size_t y = 0; y < h; y++) {
         for (size_t x = 0; x < w; x++) {
             double ep = ((x-w/2) * (x-w/2) + (y-h/2)*(y-h/2))/(sigma * sigma);
-            guass[x + y * w] = exp(ep);
+            guass[x + y * w] = c * exp(-0.5 * ep);
         }
     }
 }
 
 int main(int argc, int** argv) {
-    const int w = 300, h = 200;
+    const int w = 100, h = 100;
     double* cos = new double[h*w];
     double* guass = new double[h * w];
 
-    for (size_t i = 0; i < 1000; i++) {
+    for (size_t i = 0; i < 100; i++) {
 
         pu.startTick("cos2d");
         cos2d(cos, w, h);
@@ -68,6 +73,8 @@ int main(int argc, int** argv) {
 
         printf("-");
     }
+
+    dump2file("guass.csv", guass, w, h);
 
     pu.savePerfData();
 
