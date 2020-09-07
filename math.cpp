@@ -5,7 +5,11 @@
 #include <stdio.h>
 #include <math.h>
 
+#include "perf.h"
+
 #define PI 3.14159265
+
+PerfUtil pu;
 
 void hanning(const int m, double* d)  {
     for (size_t i = 0; i < m; i++) {
@@ -42,11 +46,16 @@ int main(int argc, int** argv) {
     double* cos = new double[h*w];
 
     for (size_t i = 0; i < 1000; i++) {
+        pu.startTick("cos2d");
         cos2d(w, h, cos);
+        pu.stopTick("cos2d");
         printf("-");
     }
 
+    pu.savePerfData();
+
     delete [] cos;
+
     printf("\ndone\n");
     return 0;
 }
