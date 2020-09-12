@@ -2,6 +2,8 @@
 #include <string>
 #include <fstream>
 #include <iostream>
+#include <complex>
+
 #include <stdio.h>
 #include <math.h>
 
@@ -56,9 +58,21 @@ void guassian2d(double* guass, const int w, const int h) {
     }
 }
 
-int main(int argc, int** argv) {
+void dft(const int N, double* x, double* abs)
+{
+    for (int k = 0; k < N; k++) {
+        complex<double> sum = 0;
+        for (int n = 0; n < N; n++) {
+            sum += x[n] * exp(complex<double>(0, -(2 * PI / N) * n * k));
+        }
+        abs[k] = sqrt( sum.real() * sum.real() + sum.imag() * sum.imag());
+    }
+}
+
+void test()
+{
     const int w = 100, h = 100;
-    double* cos = new double[h*w];
+    double* cos = new double[h * w];
     double* guass = new double[h * w];
 
     for (size_t i = 0; i < 100; i++) {
@@ -80,6 +94,22 @@ int main(int argc, int** argv) {
 
     delete[] cos;
     delete[] guass;
+}
+
+int main(int argc, int** argv) {
+    const int N = 1024;
+    double x[N] = {}, w[N] = {};
+    for (size_t i = 0; i < N; i++){
+        x[i] = i;
+    }
+
+    for (size_t i = 0; i < 10; i++)
+    {
+        pu.startTick("dft");
+        dft(N, x, w);
+        pu.stopTick("dft");
+    }
+
 
     printf("\ndone\n");
     return 0;
