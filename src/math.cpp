@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include <complex>
+#include <iomanip>
 
 #include <stdio.h>
 #include <math.h>
@@ -16,10 +17,12 @@ using namespace std;
 PerfUtil pu;
 
 void dump2file(string filename, double* data, const int w, const int h) {
+    char tmp[128] = {};
     ofstream of(filename);
     for (size_t y = 0; y < h; y++) {
         for (size_t x = 0; x < w; x++) {
-            of << data[x + w * y] << ", ";
+            sprintf_s(tmp, "%14.4f", data[x + w * y]);
+            of << tmp << ", ";
         }
         of << endl;
     }
@@ -96,20 +99,31 @@ void test()
     delete[] guass;
 }
 
-int main(int argc, int** argv) {
-    const int N = 1024;
-    double x[N] = {}, w[N] = {};
-    for (size_t i = 0; i < N; i++){
-        x[i] = i;
+void test2()
+{
+    const int N = 64 * 64;
+    double* x = new double[N];
+    double* w = new double[N];
+    for (size_t i = 0; i < N; i++) {
+        x[i] = i % 256;
     }
 
-    for (size_t i = 0; i < 10; i++)
+    for (size_t i = 0; i < 1; i++)
     {
         pu.startTick("dft");
         dft(N, x, w);
         pu.stopTick("dft");
     }
 
+    dump2file("dft.txt", w, 64, 64);
+
+    delete[] x;
+    delete[] w;
+}
+
+int main(int argc, int** argv) 
+{
+    test2();
 
     printf("\ndone\n");
     return 0;

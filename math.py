@@ -66,10 +66,17 @@ def fft(x):
     return [even[k] + T[k] for k in range(N//2)] + \
            [even[k] - T[k] for k in range(N//2)]
 
-dft()
+x=[]
+for i in range(64*64):
+    x.append(i % 256) 
 
-fft_np()
+W = [abs(f) for f in fft(x)]
+with open("fft.txt", 'wt') as f:
+    for y in range(64):
+        for x in range(64):
+            f.write("%14.4f, " % W[y*64+x])
+        f.write('\n')
 
-print(' '.join("%5.3f" % abs(f) for f in fft([1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0])))
+#print(' '.join("%5.3f" % abs(f) for f in fft([1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0])))
 
 print('\ndone')
