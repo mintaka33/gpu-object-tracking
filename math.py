@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.fft import fft
 import cmath
+from cmath import exp, pi
 
 def cos2d():
     sz = [20, 10]
@@ -28,13 +29,9 @@ def guassian2d():
     np.savetxt('e:\\dist.csv', dist, delimiter=',')
     np.savetxt('e:\\labels.csv', labels, delimiter=',')
 
-def dft_fft():
-    a = [11.0, 22.0, 33.0, 44.0]
-    b = fft(np.array(a))
-    print(b)
-    X = [abs(f) for f in b]
-    print(X)
 
+def dft(a):
+    a = [11.0, 22.0, 33.0, 44.0]
     N = 4
     c = -2*np.pi/N
     W0 = cmath.exp(complex(0, 0*c))
@@ -53,5 +50,23 @@ def dft_fft():
     F = np.dot(W, X)
     print(F)
     print([abs(f) for f in F])
+
+def fft_np():
+    a = [11.0, 22.0, 33.0, 44.0]
+    b = fft(np.array(a))
+    print(b)
+    X = [abs(f) for f in b]
+    print(X)
+
+def fft(x):
+    N = len(x)
+    if N <= 1: return x
+    even = fft(x[0::2])
+    odd =  fft(x[1::2])
+    T= [exp(-2j*pi*k/N)*odd[k] for k in range(N//2)]
+    return [even[k] + T[k] for k in range(N//2)] + \
+           [even[k] - T[k] for k in range(N//2)]
+ 
+print( ' '.join("%5.3f" % abs(f) for f in fft([1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0])) )
 
 print('\ndone')
