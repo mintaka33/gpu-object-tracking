@@ -29,9 +29,8 @@ def guassian2d():
     np.savetxt('e:\\dist.csv', dist, delimiter=',')
     np.savetxt('e:\\labels.csv', labels, delimiter=',')
 
-
-def dft(a):
-    a = [11.0, 22.0, 33.0, 44.0]
+def dft():
+    a = [1.0, 2.0, 3.0, 4.0]
     N = 4
     c = -2*np.pi/N
     W0 = cmath.exp(complex(0, 0*c))
@@ -42,9 +41,9 @@ def dft(a):
     W6 = cmath.exp(complex(0, 6*c))
     W9 = cmath.exp(complex(0, 9*c))
 
-    print(W0, W1, W2, W3, W4, W6, W9, sep='\n')
-    print([abs(n) for n in [W0, W1, W2, W3, W4, W6, W9]])
-    print(cmath.exp(complex(0, -2*np.pi)))
+    #print(W0, W1, W2, W3, W4, W6, W9, sep='\n')
+    #print([abs(n) for n in [W0, W1, W2, W3, W4, W6, W9]])
+    #print(cmath.exp(complex(0, -2*np.pi)))
     W = np.array([[W0, W0, W0, W0], [W0, W1, W2, W3], [W0, W2, W4, W6], [W0, W3, W6, W9]])
     X = np.array(a)
     F = np.dot(W, X)
@@ -66,7 +65,11 @@ def fft(x):
     T= [exp(-2j*pi*k/N)*odd[k] for k in range(N//2)]
     return [even[k] + T[k] for k in range(N//2)] + \
            [even[k] - T[k] for k in range(N//2)]
- 
-print( ' '.join("%5.3f" % abs(f) for f in fft([1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0])) )
+
+dft()
+
+fft_np()
+
+print(' '.join("%5.3f" % abs(f) for f in fft([1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0])))
 
 print('\ndone')
