@@ -1,3 +1,4 @@
+import cv2
 import numpy as np
 from numpy.fft import fft
 import cmath
@@ -95,6 +96,22 @@ def test3():
             f.write('\n')
     print('test3 finished')
 
-test3()
+def test4():
+    img = cv2.imread('test.bmp')
+    h, w = img.shape[:2]
+    C = 0.1
+    for i in range(8):
+        ang = np.random.uniform(-C, C)
+        c, s = np.cos(ang), np.sin(ang)
+        W = np.array([[c + np.random.uniform(-C, C), -s + np.random.uniform(-C, C), 0],
+                      [s + np.random.uniform(-C, C), c + np.random.uniform(-C, C), 0]])
+        center_warp = np.array([[w / 2], [h / 2]])
+        tmp = np.sum(W[:, :2], axis=1).reshape((2, 1))
+        W[:, 2:] = center_warp - center_warp * tmp
+        warped = cv2.warpAffine(img, W, (w, h), cv2.BORDER_REFLECT)
+        cv2.imwrite('out.%02d.bmp'%i, warped)
+    print('test4 finished')
+
+test4()
 
 print('\ndone')
