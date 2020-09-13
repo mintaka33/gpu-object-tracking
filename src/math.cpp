@@ -72,6 +72,22 @@ void dft(const int N, double* x, double* abs)
     }
 }
 
+void dft2d(const int M, const int N, double* f, double* F)
+{
+    for (size_t v = 0; v < N; v++) {
+        for (size_t u = 0; u < M; u++) {
+            complex<double> sum = 0;
+            for (size_t y = 0; y < N; y++) {
+                for (size_t x = 0; x < M; x++) {
+                    double tmp = (u * x / (double)M + v * y / (double)N);
+                    sum += f[y * M + x] * exp(complex<double>(0, -(2 * PI) * tmp));
+                }
+            }
+            F[v*M + u] = sqrt(sum.real() * sum.real() + sum.imag() * sum.imag());
+        }
+    }
+}
+
 void test()
 {
     const int w = 100, h = 100;
@@ -121,9 +137,30 @@ void test2()
     delete[] w;
 }
 
+void test3()
+{
+    const int w = 30, h = 20;
+    double* f = new double[w * h];
+    double* F = new double[w * h];
+    for (size_t i = 0; i < w*h; i++) {
+        f[i] = i%256;
+    }
+
+    for (size_t i = 0; i < 10; i++)
+    {
+        pu.startTick("dft-2d");
+        dft2d(w, h, f, F);
+        pu.stopTick("dft-2d");
+    }
+
+    dump2file("dft2d.txt", F, w, h);
+
+    delete[] f, F;
+}
+
 int main(int argc, int** argv) 
 {
-    test2();
+    test3();
 
     printf("\ndone\n");
     return 0;

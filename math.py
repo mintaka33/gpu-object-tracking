@@ -66,17 +66,35 @@ def fft(x):
     return [even[k] + T[k] for k in range(N//2)] + \
            [even[k] - T[k] for k in range(N//2)]
 
-x=[]
-for i in range(64*64):
-    x.append(i % 256) 
+def test():
+    print(' '.join("%5.3f" % abs(f) for f in fft([1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0])))
 
-W = [abs(f) for f in fft(x)]
-with open("fft.txt", 'wt') as f:
-    for y in range(64):
-        for x in range(64):
-            f.write("%14.4f, " % W[y*64+x])
-        f.write('\n')
+def test2():
+    x=[]
+    for i in range(64*64):
+        x.append(i % 256) 
 
-#print(' '.join("%5.3f" % abs(f) for f in fft([1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0])))
+    #W = [abs(f) for f in fft(x)]
+    W = [abs(f) for f in fft(np.array(x))]
+    with open("fft.txt", 'wt') as f:
+        for y in range(64):
+            for x in range(64):
+                f.write("%14.4f, " % W[y*64+x])
+            f.write('\n')
+
+def test3():
+    w, h = 6, 4
+    a = [i for i in range(w*h)]
+    f = np.array(a).reshape(h, w)
+    F = np.fft.fft2(f)
+    F_abs = [abs(a) for a in F]
+    with open("fft2d.txt", 'wt') as f:
+        for y in range(h):
+            for x in range(w):
+                f.write("%14.4f, " % F_abs[y][x])
+            f.write('\n')
+    print('test3 finished')
+
+test3()
 
 print('\ndone')
