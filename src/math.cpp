@@ -111,35 +111,39 @@ unsigned char bilinear(float q11, float q12, float q21, float q22, float x1, flo
     return (unsigned char)p;
 }
 
-void affine(char* src, char* dst, int width, int height, float m[3][3])
+void affine(char* src, int sw, int sh, char* dst, int dw, int dh, float m[3][3])
 {
-    for (int h = 0; h < height; h++) {
-        for (int w = 0; w < width; w++) {
+    for (int j = 0; j < dh; j++) {
+        for (int i = 0; i < dw; i++) {
             unsigned char yp = 0;
             float x1, y1, x2, y2, x, y;
             float q11[3], q12[3], q21[3], q22[3];
             int x1i, y1i, x2i, y2i;
 
-            x = m[0][0] * w + m[0][1] * h;
-            y = m[1][0] * w + m[1][1] * h;
+            x = m[0][0] * i + m[0][1] * j + m[0][2] * 1;
+            y = m[1][0] * i + m[1][1] * j + m[1][2] * 1;
+
+            //if ((x < 0) || (y < 0) || (x > (dw - 2)) || (y > (dh - 2))) {
+            //    continue;
+            //}
 
             x = (x < 0) ? 0.0 : x;
             y = (y < 0) ? 0.0 : y;
-            x = (x > (width - 2)) ? (width - 2) : x;
-            y = (y > (height - 2)) ? (height - 2) : y;
+            x = (x > (dw - 2)) ? (dw - 2) : x;
+            y = (y > (dh - 2)) ? (dh - 2) : y;
 
             x1 = trunc(x); x1i = (int)x1;
             y1 = trunc(y); y1i = (int)y1;
             x2 = x1 + 1; x2i = (int)x2;
             y2 = y1 + 1; y2i = (int)y2;
 
-            q11[0] = (unsigned char)src[(y1i * width + x1i)];
-            q12[0] = (unsigned char)src[(y1i * width + x2i)];
-            q21[0] = (unsigned char)src[(y2i * width + x1i)];
-            q22[0] = (unsigned char)src[(y2i * width + x2i)];
+            q11[0] = (unsigned char)src[(y1i * sw + x1i)];
+            q12[0] = (unsigned char)src[(y1i * sw + x2i)];
+            q21[0] = (unsigned char)src[(y2i * sw + x1i)];
+            q22[0] = (unsigned char)src[(y2i * sw + x2i)];
             yp = bilinear(q11[0], q12[0], q21[0], q22[0], x1, y1, x2, y2, x, y);
 
-            dst[(h * width + w)] = yp;
+            dst[(j * dw + i)] = yp;
         }
     }
 }
@@ -222,29 +226,29 @@ void test_dft2d()
 
 void test_affine()
 {
-    int width = 320, height = 240;
-    char* src = new char[width * height];
-    memset(src, 0, width * height);
+    int srcw = 320, srch = 240;
+    char* src = new char[srcw * srch];
+    memset(src, 0, srcw * srch);
     char* dst = nullptr;
     int dstw = 0, dsth = 0;
 
     ifstream infile;
     infile.open("test.yuv", ios::binary);
-    infile.read(src, width * height);
+    infile.read(src, srcw * srch);
     infile.close();
 
     // Translation
     int tx = 20;
     int ty = 10;
     float translation[3][3] = {
-        {tx,  0,  0},
-        { 0, ty,  0},
-        { 0,  0,  1}
+        { 1,  0,  tx},
+        { 0,  1,  ty},
+        { 0,  0,   1}
     };
-    dstw = (int)(width + tx);
-    dsth = (int)(height + ty);
+    dstw = (int)(srcw + tx);
+    dsth = (int)(srch + ty);
     dst = new char[dstw * dsth];
-    affine(src, dst, dstw, dsth, translation);
+    affine(src, srcw, srch, dst, dstw, dsth, translation);
     dump2yuv(dst, dstw, dsth, 1);
     delete[] dst;
 
@@ -256,11 +260,11 @@ void test_affine()
         { 0, sy, 0},
         { 0, 0,  1}
     };
-    dstw = (int)(width * sx);
-    dsth = (int)(height * sy);
+    dstw = (int)(srcw * sx);
+    dsth = (int)(srch * sy);
     dst = new char[dstw * dsth];
     memset(dst, 0, dstw * dsth);
-    affine(src, dst, dstw, dsth, scale);
+    affine(src, srcw, srch, dst, dstw, dsth, scale);
     dump2yuv(dst, dstw, dsth, 2);
     delete[] dst;
 
@@ -272,10 +276,10 @@ void test_affine()
         {shx,   1,  0 },
         {  0,   0,  1 }
     };
-    dstw = (int)(width * shx);
-    dsth = (int)(height * shy);
+    dstw = (int)(srcw * shx);
+    dsth = (int)(srch * shy);
     dst = new char[dstw * dsth];
-    affine(src, dst, dstw, dsth, shear);
+    affine(src, srcw, srch, dst, dstw, dsth, shear);
     dump2yuv(dst, dstw, dsth, 3);
     delete[] dst;
 
@@ -286,10 +290,10 @@ void test_affine()
         {-sin(d), cos(d), 0 },
         {      0,      0, 1 },
     };
-    dstw = (int)(width);
-    dsth = (int)(height);
+    dstw = (int)(srcw);
+    dsth = (int)(srch);
     dst = new char[dstw * dsth];
-    affine(src, dst, dstw, dsth, rotation);
+    affine(src, srcw, srch, dst, dstw, dsth, rotation);
     dump2yuv(dst, dstw, dsth, 4);
     delete[] dst;
 
