@@ -16,7 +16,8 @@ using namespace std;
 
 PerfUtil pu;
 
-void dump2file(string filename, double* data, const int w, const int h) {
+void dump2text(string filename, double* data, const int w, const int h) 
+{
     char tmp[128] = {};
     ofstream of(filename);
     for (size_t y = 0; y < h; y++) {
@@ -27,6 +28,16 @@ void dump2file(string filename, double* data, const int w, const int h) {
         of << endl;
     }
     of.close();
+}
+
+void dump2yuv(char* dst, int w, int h, int i = 0)
+{
+    ofstream outfile;
+    char filename[256] = {};
+    sprintf_s(filename, "out_%d_%d_%02d.yuv", w, h, i);
+    outfile.open(filename, ios::binary);
+    outfile.write(dst, w*h);
+    outfile.close();
 }
 
 void hanning(const int m, double* d)  {
@@ -88,34 +99,85 @@ void dft2d(const int M, const int N, double* f, double* F)
     }
 }
 
-void test()
+unsigned char bilinear(float q11, float q12, float q21, float q22, float x1, float y1, float x2, float y2, float x, float y)
+{
+    float r1, r2, p;
+    r1 = (x2 - x)*q11 / (x2 - x1) + (x - x1)*q12 / (x2 - x1);
+    r2 = (x2 - x)*q21 / (x2 - x1) + (x - x1)*q22 / (x2 - x1);
+    p = (y2 - y)*r1 / (y2 - y1) + (y - y1)*r2 / (y2 - y1);
+
+    if (p < 0) return 0;
+    if (p > 255) return 255;
+    return (unsigned char)p;
+}
+
+void affine(char* src, char* dst, int width, int height, float m[3][3])
+{
+    for (int h = 0; h < height; h++) {
+        for (int w = 0; w < width; w++) {
+            unsigned char yp = 0;
+            float x1, y1, x2, y2, x, y;
+            float q11[3], q12[3], q21[3], q22[3];
+            int x1i, y1i, x2i, y2i;
+
+            x = m[0][0] * w + m[0][1] * h;
+            y = m[1][0] * w + m[1][1] * h;
+
+            x = (x < 0) ? 0.0 : x;
+            y = (y < 0) ? 0.0 : y;
+            x = (x > (width - 2)) ? (width - 2) : x;
+            y = (y > (height - 2)) ? (height - 2) : y;
+
+            x1 = trunc(x); x1i = (int)x1;
+            y1 = trunc(y); y1i = (int)y1;
+            x2 = x1 + 1; x2i = (int)x2;
+            y2 = y1 + 1; y2i = (int)y2;
+
+            q11[0] = (unsigned char)src[(y1i * width + x1i)];
+            q12[0] = (unsigned char)src[(y1i * width + x2i)];
+            q21[0] = (unsigned char)src[(y2i * width + x1i)];
+            q22[0] = (unsigned char)src[(y2i * width + x2i)];
+            yp = bilinear(q11[0], q12[0], q21[0], q22[0], x1, y1, x2, y2, x, y);
+
+            dst[(h * width + w)] = yp;
+        }
+    }
+}
+
+void test_cos2d()
 {
     const int w = 100, h = 100;
     double* cos = new double[h * w];
-    double* guass = new double[h * w];
 
     for (size_t i = 0; i < 100; i++) {
-
         pu.startTick("cos2d");
         cos2d(cos, w, h);
         pu.stopTick("cos2d");
-
-        pu.startTick("guass2d");
-        guassian2d(guass, w, h);
-        pu.stopTick("guass2d");
-
         printf("-");
     }
 
-    dump2file("guass.csv", guass, w, h);
-
     pu.savePerfData();
-
     delete[] cos;
+}
+
+void test_guass()
+{
+    const int w = 100, h = 100;
+    double* guass = new double[h * w];
+
+    for (size_t i = 0; i < 100; i++) {
+        pu.startTick("guass2d");
+        guassian2d(guass, w, h);
+        pu.stopTick("guass2d");
+        printf("-");
+    }
+
+    dump2text("guass.csv", guass, w, h);
+    pu.savePerfData();
     delete[] guass;
 }
 
-void test2()
+void test_dft()
 {
     const int N = 64 * 64;
     double* x = new double[N];
@@ -131,13 +193,13 @@ void test2()
         pu.stopTick("dft");
     }
 
-    dump2file("dft.txt", w, 64, 64);
+    dump2text("dft.txt", w, 64, 64);
 
     delete[] x;
     delete[] w;
 }
 
-void test3()
+void test_dft2d()
 {
     const int w = 30, h = 20;
     double* f = new double[w * h];
@@ -153,14 +215,90 @@ void test3()
         pu.stopTick("dft-2d");
     }
 
-    dump2file("dft2d.txt", F, w, h);
+    dump2text("dft2d.txt", F, w, h);
 
     delete[] f, F;
 }
 
+void test_affine()
+{
+    int width = 320, height = 240;
+    char* src = new char[width * height];
+    memset(src, 0, width * height);
+    char* dst = nullptr;
+    int dstw = 0, dsth = 0;
+
+    ifstream infile;
+    infile.open("test.yuv", ios::binary);
+    infile.read(src, width * height);
+    infile.close();
+
+    // Translation
+    int tx = 20;
+    int ty = 10;
+    float translation[3][3] = {
+        {tx,  0,  0},
+        { 0, ty,  0},
+        { 0,  0,  1}
+    };
+    dstw = (int)(width + tx);
+    dsth = (int)(height + ty);
+    dst = new char[dstw * dsth];
+    affine(src, dst, dstw, dsth, translation);
+    dump2yuv(dst, dstw, dsth, 1);
+    delete[] dst;
+
+    // Scale
+    float sx = 1.2;
+    float sy = 1.1;
+    float scale[3][3] = {
+        {sx, 0,  0},
+        { 0, sy, 0},
+        { 0, 0,  1}
+    };
+    dstw = (int)(width * sx);
+    dsth = (int)(height * sy);
+    dst = new char[dstw * dsth];
+    memset(dst, 0, dstw * dsth);
+    affine(src, dst, dstw, dsth, scale);
+    dump2yuv(dst, dstw, dsth, 2);
+    delete[] dst;
+
+    // Shear
+    float shx = 1.2;
+    float shy = 1.0;
+    float shear[3][3] = {
+        {  1, shy,  0 },
+        {shx,   1,  0 },
+        {  0,   0,  1 }
+    };
+    dstw = (int)(width * shx);
+    dsth = (int)(height * shy);
+    dst = new char[dstw * dsth];
+    affine(src, dst, dstw, dsth, shear);
+    dump2yuv(dst, dstw, dsth, 3);
+    delete[] dst;
+
+    // Rotation
+    float d = -10 * (PI / 180);
+    float rotation[3][3] = {
+        { cos(d), sin(d), 0 },
+        {-sin(d), cos(d), 0 },
+        {      0,      0, 1 },
+    };
+    dstw = (int)(width);
+    dsth = (int)(height);
+    dst = new char[dstw * dsth];
+    affine(src, dst, dstw, dsth, rotation);
+    dump2yuv(dst, dstw, dsth, 4);
+    delete[] dst;
+
+    delete[] src;
+}
+
 int main(int argc, int** argv) 
 {
-    test3();
+    test_affine();
 
     printf("\ndone\n");
     return 0;
