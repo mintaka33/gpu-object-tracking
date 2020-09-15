@@ -123,9 +123,9 @@ void affine(char* src, int sw, int sh, char* dst, int dw, int dh, float m[3][3])
             x = m[0][0] * i + m[0][1] * j + m[0][2] * 1;
             y = m[1][0] * i + m[1][1] * j + m[1][2] * 1;
 
-            //if ((x < 0) || (y < 0) || (x > (dw - 2)) || (y > (dh - 2))) {
-            //    continue;
-            //}
+            if ((x < 0) || (y < 0) || (x > (dw - 2)) || (y > (dh - 2))) {
+                continue;
+            }
 
             x = (x < 0) ? 0.0 : x;
             y = (y < 0) ? 0.0 : y;
@@ -245,23 +245,23 @@ void test_affine()
         { 0,  1,  ty},
         { 0,  0,   1}
     };
-    dstw = (int)(srcw + tx);
-    dsth = (int)(srch + ty);
+    dstw = srcw;
+    dsth = srch;
     dst = new char[dstw * dsth];
     affine(src, srcw, srch, dst, dstw, dsth, translation);
     dump2yuv(dst, dstw, dsth, 1);
     delete[] dst;
 
     // Scale
-    float sx = 1.2;
-    float sy = 1.1;
+    float sx = 0.5;
+    float sy = 1.5;
     float scale[3][3] = {
         {sx, 0,  0},
         { 0, sy, 0},
         { 0, 0,  1}
     };
-    dstw = (int)(srcw * sx);
-    dsth = (int)(srch * sy);
+    dstw = srcw;
+    dsth = srch;
     dst = new char[dstw * dsth];
     memset(dst, 0, dstw * dsth);
     affine(src, srcw, srch, dst, dstw, dsth, scale);
@@ -269,29 +269,29 @@ void test_affine()
     delete[] dst;
 
     // Shear
-    float shx = 1.2;
-    float shy = 1.0;
+    float shx = 0.2;
+    float shy = 0.1;
     float shear[3][3] = {
-        {  1, shy,  0 },
-        {shx,   1,  0 },
+        {  1, shx,  0 },
+        {shy,   1,  0 },
         {  0,   0,  1 }
     };
-    dstw = (int)(srcw * shx);
-    dsth = (int)(srch * shy);
+    dstw = srcw;
+    dsth = srch;
     dst = new char[dstw * dsth];
     affine(src, srcw, srch, dst, dstw, dsth, shear);
     dump2yuv(dst, dstw, dsth, 3);
     delete[] dst;
 
     // Rotation
-    float d = -10 * (PI / 180);
+    float d = -5 * (PI / 180);
     float rotation[3][3] = {
         { cos(d), sin(d), 0 },
         {-sin(d), cos(d), 0 },
         {      0,      0, 1 },
     };
-    dstw = (int)(srcw);
-    dsth = (int)(srch);
+    dstw = srcw;
+    dsth = srch;
     dst = new char[dstw * dsth];
     affine(src, srcw, srch, dst, dstw, dsth, rotation);
     dump2yuv(dst, dstw, dsth, 4);

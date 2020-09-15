@@ -2,6 +2,9 @@ import sys
 import os
 import glob
 
+os.system('del out_*.yuv')
+os.system('math.exe')
+
 for f in glob.glob('./*.yuv'): 
 	if 'out' in f:
 		base = os.path.basename(f)
