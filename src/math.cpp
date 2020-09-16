@@ -16,6 +16,13 @@ using namespace std;
 
 PerfUtil pu;
 
+struct Rect {
+    int x;
+    int y;
+    int w;
+    int h;
+};
+
 void dump2text(string filename, double* data, const int w, const int h) 
 {
     char tmp[128] = {};
@@ -146,6 +153,60 @@ void affine(char* src, int sw, int sh, char* dst, int dw, int dh, float m[3][3])
             dst[(j * dw + i)] = yp;
         }
     }
+}
+
+void random_affine()
+{
+    float d = -5 * (PI / 180);
+    float rotation[3][3] = {
+        { cos(d), sin(d), 0 },
+        {-sin(d), cos(d), 0 },
+        {      0,      0, 1 },
+    };
+}
+
+void mosse_init(char* src, int srcw, int srch, Rect r)
+{
+    int cx = r.x + r.w / 2;
+    int cy = r.y + r.h / 2;
+
+    // Cosine window
+    double* cos = new double[r.w * r.h];
+    cos2d(cos, r.w, r.h);
+
+    // Gaussian target
+    double* g = new double[r.w * r.h];
+    guassian2d(g, r.w, r.h);
+
+    // DFT Gaussian target
+    double* G = new double[r.w * r.h];
+    memset(G, 0, sizeof(double) * r.w * r.h);
+    dft2d(r.w, r.h, g, G);
+
+    double* Ai = new double[r.w * r.h];
+    memset(Ai, 0, sizeof(double) * r.w * r.h);
+    double* Bi = new double[r.w * r.h];
+    memset(Bi, 0, sizeof(double) * r.w * r.h);
+
+    // load original ROI
+    char* roi = new char[r.w * r.h];
+    for (size_t y = 0; y < r.h; y++) {
+        for (size_t x = 0; x < r.w; x++) {
+            roi[y * r.w + x] = src[(y+r.y)*srcw + (x+r.x)];
+        }
+    }
+    //dump2yuv(roi, r.w, r.h, 2);
+
+    for (size_t i = 0; i < 8; i++) {
+
+    }
+
+    delete[] roi;
+}
+
+void mosse_update()
+{
+
 }
 
 void test_cos2d()
@@ -300,9 +361,29 @@ void test_affine()
     delete[] src;
 }
 
+void test_mosse()
+{
+    int srcw = 640, srch = 360;
+    char* src = new char[srcw * srch];
+    memset(src, 0, srcw * srch);
+
+    ifstream infile;
+    infile.open("tmp1.yuv", ios::binary);
+    infile.read(src, srcw * srch);
+    infile.close();
+
+    //dump2yuv(src, srcw, srch, 1);
+
+    Rect rect = { 196, 35, 145, 179 };
+    mosse_init(src, srcw, srch, rect);
+
+    delete[] src;
+    return;
+}
+
 int main(int argc, int** argv) 
 {
-    test_affine();
+    test_mosse();
 
     printf("\ndone\n");
     return 0;
