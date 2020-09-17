@@ -157,12 +157,7 @@ void affine(char* src, int sw, int sh, char* dst, int dw, int dh, float m[3][3])
 
 void random_affine()
 {
-    float d = -5 * (PI / 180);
-    float rotation[3][3] = {
-        { cos(d), sin(d), 0 },
-        {-sin(d), cos(d), 0 },
-        {      0,      0, 1 },
-    };
+
 }
 
 void mosse_init(char* src, int srcw, int srch, Rect r)
@@ -171,8 +166,8 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
     int cy = r.y + r.h / 2;
 
     // Cosine window
-    double* cos = new double[r.w * r.h];
-    cos2d(cos, r.w, r.h);
+    double* cw = new double[r.w * r.h];
+    cos2d(cw, r.w, r.h);
 
     // Gaussian target
     double* g = new double[r.w * r.h];
@@ -181,7 +176,7 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
     // DFT Gaussian target
     double* G = new double[r.w * r.h];
     memset(G, 0, sizeof(double) * r.w * r.h);
-    dft2d(r.w, r.h, g, G);
+    //dft2d(r.w, r.h, g, G);
 
     double* Ai = new double[r.w * r.h];
     memset(Ai, 0, sizeof(double) * r.w * r.h);
@@ -195,9 +190,20 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
             roi[y * r.w + x] = src[(y+r.y)*srcw + (x+r.x)];
         }
     }
-    //dump2yuv(roi, r.w, r.h, 2);
+    dump2yuv(roi, r.w, r.h, 20);
 
-    for (size_t i = 0; i < 8; i++) {
+    float angles[8] = { 0, -4.7, 3.8, -4.1, -0.9, 3.0, 0.5, -4.8 };
+    for (size_t i = 0; i < 1; i++) {
+        float d = angles[i] * (PI / 180);
+        float m[3][3] = {
+            { cos(d), sin(d), 0 },
+            {-sin(d), cos(d), 0 },
+            {      0,      0, 1 }
+        };
+        char* dst = new char[r.w * r.h];
+        memset(dst, 0, r.w * r.h);
+        affine(src, r.w, r.h, dst, r.w, r.h, m);
+        dump2yuv(dst, r.w, r.h, i);
 
     }
 
