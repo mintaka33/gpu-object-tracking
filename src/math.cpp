@@ -202,7 +202,7 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
         };
         char* dst = new char[r.w * r.h];
         memset(dst, 0, r.w * r.h);
-        affine(src, r.w, r.h, dst, r.w, r.h, m);
+        affine(roi, r.w, r.h, dst, r.w, r.h, m);
         dump2yuv(dst, r.w, r.h, i);
 
     }
