@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <math.h>
+#include <stdlib.h>
 
 #include "perf.h"
 
@@ -23,7 +24,13 @@ struct Rect {
     int h;
 };
 
-void dump2text(string filename, double* data, const int w, const int h) 
+struct Buf2D {
+    char* buf;
+    int w;
+    int h;
+};
+
+void dump2text(string filename, float* data, const int w, const int h) 
 {
     char tmp[128] = {};
     ofstream of(filename);
@@ -47,15 +54,15 @@ void dump2yuv(char* dst, int w, int h, int i = 0)
     outfile.close();
 }
 
-void hanning(const int m, double* d)  {
+void hanning(const int m, float* d)  {
     for (size_t i = 0; i < m; i++) {
         d[i] = 0.5 - 0.5 * cos(2*PI*i/(m-1));
     }
 }
 
-void cos2d(double* cos, const int w, const int h) {
-    double* cos_w = new double[w];
-    double* cos_h = new double[h];
+void cos2d(float* cos, const int w, const int h) {
+    float* cos_w = new float[w];
+    float* cos_h = new float[h];
     hanning(w, cos_w);
     hanning(h, cos_h);
 
@@ -68,37 +75,37 @@ void cos2d(double* cos, const int w, const int h) {
     delete[] cos_h;
 }
 
-void guassian2d(double* guass, const int w, const int h) {
-    const double sigma = 2.0;
-    double c = 1 / (2 * PI * sigma * sigma);
+void guassian2d(float* guass, const int w, const int h) {
+    const float sigma = 2.0;
+    float c = 1 / (2 * PI * sigma * sigma);
     for (size_t y = 0; y < h; y++) {
         for (size_t x = 0; x < w; x++) {
-            double ep = ((x-w/2) * (x-w/2) + (y-h/2)*(y-h/2))/(sigma * sigma);
+            float ep = ((x-w/2) * (x-w/2) + (y-h/2)*(y-h/2))/(sigma * sigma);
             guass[x + y * w] = c * exp(-0.5 * ep);
         }
     }
 }
 
-void dft(const int N, double* x, double* abs)
+void dft(const int N, float* x, float* abs)
 {
     for (int k = 0; k < N; k++) {
-        complex<double> sum = 0;
+        complex<float> sum = 0;
         for (int n = 0; n < N; n++) {
-            sum += x[n] * exp(complex<double>(0, -(2 * PI / N) * n * k));
+            sum += x[n] * exp(complex<float>(0, -(2 * PI / N) * n * k));
         }
         abs[k] = sqrt( sum.real() * sum.real() + sum.imag() * sum.imag());
     }
 }
 
-void dft2d(const int M, const int N, double* f, double* F)
+void dft2d(const int M, const int N, float* f, float* F)
 {
     for (size_t v = 0; v < N; v++) {
         for (size_t u = 0; u < M; u++) {
-            complex<double> sum = 0;
+            complex<float> sum = 0;
             for (size_t y = 0; y < N; y++) {
                 for (size_t x = 0; x < M; x++) {
-                    double tmp = (u * x / (double)M + v * y / (double)N);
-                    sum += f[y * M + x] * exp(complex<double>(0, -(2 * PI) * tmp));
+                    float tmp = (u * x / (float)M + v * y / (float)N);
+                    sum += f[y * M + x] * exp(complex<float>(0, -(2 * PI) * tmp));
                 }
             }
             F[v*M + u] = sqrt(sum.real() * sum.real() + sum.imag() * sum.imag());
@@ -155,9 +162,30 @@ void affine(char* src, int sw, int sh, char* dst, int dw, int dh, float m[3][3])
     }
 }
 
-void random_affine()
+void preproc(uint8_t* f, float* cos, float* dst, int w,  int h)
 {
+    const float eps = 1e-5;
+    for (size_t y = 0; y < h; y++)
+        for (size_t x = 0; x < w; x++)
+            dst[y * w + x] = log(float(f[y * w + x]) + 1);
 
+    float avg = 0;
+    for (size_t y = 0; y < h; y++)
+        for (size_t x = 0; x < w; x++)
+            avg += dst[y * w + x];
+    avg = avg / (w * h);
+
+    float sd = 0;
+    for (size_t y = 0; y < h; y++)
+        for (size_t x = 0; x < w; x++)
+            sd += (dst[y * w + x] - avg) * (dst[y * w + x] - avg);
+    sd = sqrt(sd / (w * h));
+
+    for (size_t y = 0; y < h; y++) {
+        for (size_t x = 0; x < w; x++) {
+            dst[y * w + x] = ((dst[y * w + x] - avg) / (sd + eps)) * cos[y * w + x];
+        }
+    }
 }
 
 void mosse_init(char* src, int srcw, int srch, Rect r)
@@ -166,22 +194,22 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
     int cy = r.y + r.h / 2;
 
     // Cosine window
-    double* cw = new double[r.w * r.h];
+    float* cw = new float[r.w * r.h];
     cos2d(cw, r.w, r.h);
 
     // Gaussian target
-    double* g = new double[r.w * r.h];
+    float* g = new float[r.w * r.h];
     guassian2d(g, r.w, r.h);
 
     // DFT Gaussian target
-    double* G = new double[r.w * r.h];
-    memset(G, 0, sizeof(double) * r.w * r.h);
-    //dft2d(r.w, r.h, g, G);
+    float* G = new float[r.w * r.h];
+    memset(G, 0, sizeof(float) * r.w * r.h);
+    dft2d(r.w, r.h, g, G);
 
-    double* Ai = new double[r.w * r.h];
-    memset(Ai, 0, sizeof(double) * r.w * r.h);
-    double* Bi = new double[r.w * r.h];
-    memset(Bi, 0, sizeof(double) * r.w * r.h);
+    float* Ai = new float[r.w * r.h];
+    memset(Ai, 0, sizeof(float) * r.w * r.h);
+    float* Bi = new float[r.w * r.h];
+    memset(Bi, 0, sizeof(float) * r.w * r.h);
 
     // load original ROI
     char* roi = new char[r.w * r.h];
@@ -193,7 +221,7 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
     dump2yuv(roi, r.w, r.h, 20);
 
     float angles[8] = { 0, -4.7, 3.8, -4.1, -0.9, 3.0, 0.5, -4.8 };
-    for (size_t i = 0; i < 1; i++) {
+    for (size_t i = 0; i < 8; i++) {
         float d = angles[i] * (PI / 180);
         float m[3][3] = {
             { cos(d), sin(d), 0 },
@@ -203,7 +231,7 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
         char* dst = new char[r.w * r.h];
         memset(dst, 0, r.w * r.h);
         affine(roi, r.w, r.h, dst, r.w, r.h, m);
-        dump2yuv(dst, r.w, r.h, i);
+        //dump2yuv(dst, r.w, r.h, i);
 
     }
 
@@ -218,7 +246,7 @@ void mosse_update()
 void test_cos2d()
 {
     const int w = 100, h = 100;
-    double* cos = new double[h * w];
+    float* cos = new float[h * w];
 
     for (size_t i = 0; i < 100; i++) {
         pu.startTick("cos2d");
@@ -234,7 +262,7 @@ void test_cos2d()
 void test_guass()
 {
     const int w = 100, h = 100;
-    double* guass = new double[h * w];
+    float* guass = new float[h * w];
 
     for (size_t i = 0; i < 100; i++) {
         pu.startTick("guass2d");
@@ -251,8 +279,8 @@ void test_guass()
 void test_dft()
 {
     const int N = 64 * 64;
-    double* x = new double[N];
-    double* w = new double[N];
+    float* x = new float[N];
+    float* w = new float[N];
     for (size_t i = 0; i < N; i++) {
         x[i] = i % 256;
     }
@@ -273,8 +301,8 @@ void test_dft()
 void test_dft2d()
 {
     const int w = 30, h = 20;
-    double* f = new double[w * h];
-    double* F = new double[w * h];
+    float* f = new float[w * h];
+    float* F = new float[w * h];
     for (size_t i = 0; i < w*h; i++) {
         f[i] = i%256;
     }
@@ -289,6 +317,25 @@ void test_dft2d()
     dump2text("dft2d.txt", F, w, h);
 
     delete[] f, F;
+}
+
+void test_preproc()
+{
+    const int w = 20, h = 10;
+    uint8_t* src = new uint8_t[w * h];
+    float* dst = new float[w * h];
+    float* cos = new float[w * h];
+
+    for (size_t i = 0; i < w*h; i++) {
+        src[i] = i;
+    }
+
+    cos2d(cos, w, h);
+    preproc(src, cos, dst, w, h);
+    dump2text("out.preproc.txt", dst, w, h);
+
+    delete[] src;
+    delete[] dst, cos;
 }
 
 void test_affine()
@@ -380,7 +427,7 @@ void test_mosse()
 
     //dump2yuv(src, srcw, srch, 1);
 
-    Rect rect = { 196, 35, 145, 179 };
+    Rect rect = { 387, 198, 30, 62 };
     mosse_init(src, srcw, srch, rect);
 
     delete[] src;
@@ -389,7 +436,12 @@ void test_mosse()
 
 int main(int argc, int** argv) 
 {
-    test_mosse();
+    uint8_t a = 0;
+    printf("log = %f\n", log(a+1));
+
+    test_preproc();
+
+    //test_mosse();
 
     printf("\ndone\n");
     return 0;

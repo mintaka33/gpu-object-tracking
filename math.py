@@ -4,6 +4,19 @@ from numpy.fft import fft
 import cmath
 from cmath import exp, pi
 
+def dump2txt(filename, a):
+    h, w = a.shape
+    outstr = []
+    for y in range(h):
+        line = ''
+        for x in range(w):
+            line += '%14.4f, '%a[y][x]
+        outstr.append(line+'\n')
+
+    with open(filename, 'wt') as f:
+        for line in outstr:
+            f.write(line)
+
 def cos2d():
     sz = [20, 10]
     a = np.hanning(int(sz[1]))
@@ -67,6 +80,25 @@ def fft(x):
     return [even[k] + T[k] for k in range(N//2)] + \
            [even[k] - T[k] for k in range(N//2)]
 
+def cos_window(sz):
+    cos_window = np.hanning(int(sz[1]))[:, np.newaxis].dot(np.hanning(int(sz[0]))[np.newaxis, :])
+    return cos_window
+
+def preprocessing(img, cos_window, eps=1e-5):
+    img=np.log(img+1)
+    img=(img-np.mean(img))/(np.std(img)+eps)
+    return cos_window*img
+
+def test_preproc():
+    w, h = 20, 10
+    f = np.arange((w*h)).reshape((h, w)).astype(np.uint8)
+    dump2txt('dump.f.txt', f)
+    #dst = np.zeros((h, w)).astype(np.float)
+    cos = cos_window((w, h))
+    dump2txt('dump.cos.txt', cos)
+    dst = preprocessing(f, cos)
+    dump2txt('dump.dst.txt', dst)
+
 def test():
     print(' '.join("%5.3f" % abs(f) for f in fft([1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0])))
 
@@ -112,6 +144,6 @@ def test4():
         cv2.imwrite('out.%02d.bmp'%i, warped)
     print('test4 finished')
 
-test4()
+test_preproc()
 
 print('\ndone')
