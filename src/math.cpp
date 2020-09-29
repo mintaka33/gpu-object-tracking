@@ -108,7 +108,8 @@ void dft2d(const int M, const int N, float* f, float* F)
                     sum += f[y * M + x] * exp(complex<float>(0, -(2 * PI) * tmp));
                 }
             }
-            F[v*M + u] = sqrt(sum.real() * sum.real() + sum.imag() * sum.imag());
+            F[v * M * 2 + 2 * u + 0] = sum.real();
+            F[v * M * 2 + 2 * u + 1] = sum.imag();
         }
     }
 }
@@ -195,21 +196,27 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
 
     // Cosine window
     float* cw = new float[r.w * r.h];
+    pu.startTick("cos2d");
     cos2d(cw, r.w, r.h);
+    pu.stopTick("cos2d");
 
     // Gaussian target
     float* g = new float[r.w * r.h];
+    pu.startTick("guassian2d");
     guassian2d(g, r.w, r.h);
+    pu.stopTick("guassian2d");
 
     // DFT Gaussian target
-    float* G = new float[r.w * r.h];
+    float* G = new float[2 * r.w * r.h];
     memset(G, 0, sizeof(float) * r.w * r.h);
+    pu.startTick("Gauss-DFT");
     dft2d(r.w, r.h, g, G);
+    pu.stopTick("Gauss-DFT");
 
-    float* Ai = new float[r.w * r.h];
-    memset(Ai, 0, sizeof(float) * r.w * r.h);
-    float* Bi = new float[r.w * r.h];
-    memset(Bi, 0, sizeof(float) * r.w * r.h);
+    float* Ai = new float[2 * r.w * r.h];
+    memset(Ai, 0, sizeof(float) * 2 * r.w * r.h);
+    float* Bi = new float[2 * r.w * r.h];
+    memset(Bi, 0, sizeof(float) * 2 * r.w * r.h);
 
     // load original ROI
     char* roi = new char[r.w * r.h];
@@ -220,6 +227,10 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
     }
     dump2yuv(roi, r.w, r.h, 20);
 
+    char* fa = new char[r.w * r.h];
+    float* fi = new float[r.w * r.h];
+    float* Fi = new float[2 * r.w * r.h];
+
     float angles[8] = { 0, -4.7, 3.8, -4.1, -0.9, 3.0, 0.5, -4.8 };
     for (size_t i = 0; i < 8; i++) {
         float d = angles[i] * (PI / 180);
@@ -228,11 +239,37 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
             {-sin(d), cos(d), 0 },
             {      0,      0, 1 }
         };
-        char* dst = new char[r.w * r.h];
-        memset(dst, 0, r.w * r.h);
-        affine(roi, r.w, r.h, dst, r.w, r.h, m);
-        //dump2yuv(dst, r.w, r.h, i);
 
+        memset(fa, 0, r.w * r.h);
+
+        pu.startTick("affine");
+        affine(roi, r.w, r.h, fa, r.w, r.h, m);
+        pu.stopTick("affine");
+
+        //dump2yuv(fa, r.w, r.h, i);
+
+        pu.startTick("preproc");
+        preproc((uint8_t*)fa, cw, fi, r.w, r.h);
+        pu.stopTick("preproc");
+
+        pu.startTick("fi-dft2d");
+        dft2d(r.w, r.h, fi, Fi);
+        pu.stopTick("fi-dft2d");
+
+        pu.startTick("Ai-Bi");
+        for (size_t y = 0; y < r.h; y++) {
+            for (size_t x = 0; x < r.w; x++) {
+                float gr = G[y * r.w * 2 + x * 2];
+                float gi = G[y * r.w * 2 + x * 2 + 1];
+                float fir = Fi[y * r.w * 2 + x * 2];
+                float fii = Fi[y * r.w * 2 + x * 2 + 1];
+                Ai[y * r.w * 2 + x * 2] = gr * fir + gi * fii;
+                Ai[y * r.w * 2 + x * 2 + 1] = gr * fii + gi * fir;
+                Bi[y * r.w * 2 + x * 2] = gr * gr + gi * gi;
+                Bi[y * r.w * 2 + x * 2 + 1] = 2 * gr * gi;
+            }
+        }
+        pu.stopTick("Ai-Bi");
     }
 
     delete[] roi;
@@ -436,12 +473,7 @@ void test_mosse()
 
 int main(int argc, int** argv) 
 {
-    uint8_t a = 0;
-    printf("log = %f\n", log(a+1));
-
-    test_preproc();
-
-    //test_mosse();
+    test_mosse();
 
     printf("\ndone\n");
     return 0;
