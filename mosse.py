@@ -77,34 +77,39 @@ def track_update(frame):
     Bi = interp_factor * (Fi * np.conj(Fi)) + (1 - interp_factor) * Bi
     return bb
 
-cap = cv2.VideoCapture('test.265')
-if not cap.isOpened():
-    print("ERROR: cannot open video file!")
-    exit()
+def main():
+    cap = cv2.VideoCapture('test.265')
+    if not cap.isOpened():
+        print("ERROR: cannot open video file!")
+        exit()
 
-init_bb = None
-while True:
-    ret, frame = cap.read()
-    if ret ==  False:
-        break
-    frame_gray = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
+    init_bb = None
+    while True:
+        ret, frame = cap.read()
+        if ret ==  False:
+            break
+        frame_gray = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
 
-    if init_bb is None:
-        init_bb = cv2.selectROI("Frame", frame, fromCenter=False, showCrosshair=True)
-        track_init(init_bb, frame_gray)
-        x, y, w, h = init_bb[0], init_bb[1], init_bb[2], init_bb[3]
-        cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
-        print(init_bb)
-    else:
-        out_bb = track_update(frame_gray)
-        x, y, w, h = out_bb[0], out_bb[1], out_bb[2], out_bb[3]
-        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        print(out_bb)
+        if init_bb is None:
+            init_bb = cv2.selectROI("Frame", frame, fromCenter=False, showCrosshair=True)
+            track_init(init_bb, frame_gray)
+            x, y, w, h = init_bb[0], init_bb[1], init_bb[2], init_bb[3]
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+            print(init_bb)
+        else:
+            out_bb = track_update(frame_gray)
+            x, y, w, h = out_bb[0], out_bb[1], out_bb[2], out_bb[3]
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            print(out_bb)
 
-    cv2.imshow("Frame", frame)
-    key = cv2.waitKey(0) & 0xFF
-    if key == ord("q"):
-        break
+        cv2.imshow("Frame", frame)
+        key = cv2.waitKey(0) & 0xFF
+        if key == ord("q"):
+            break
 
-cv2.destroyAllWindows()
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    main()
+    print('done')
 

@@ -272,6 +272,9 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
         pu.stopTick("Ai-Bi");
     }
 
+    dump2text("dump.cpp.Ai.txt", Ai, 2 * r.w, r.h);
+    dump2text("dump.cpp.Bi.txt", Bi, 2 * r.w, r.h);
+
     delete[] roi;
 }
 

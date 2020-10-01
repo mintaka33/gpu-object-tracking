@@ -3,6 +3,7 @@ import numpy as np
 from numpy.fft import fft
 import cmath
 from cmath import exp, pi
+import mosse
 
 def dump2txt(filename, a):
     h, w = a.shape
@@ -13,6 +14,7 @@ def dump2txt(filename, a):
             line += '%14.4f, '%a[y][x]
         outstr.append(line+'\n')
 
+    filename += '.%dx%d.txt'%(w, h)
     with open(filename, 'wt') as f:
         for line in outstr:
             f.write(line)
@@ -144,6 +146,32 @@ def test4():
         cv2.imwrite('out.%02d.bmp'%i, warped)
     print('test4 finished')
 
-test_preproc()
+def test_mosse_init():
+    w, h = 640, 360
+    r = [387, 198, 30, 62]
+    y1 = np.zeros((h, w))
+    y2 = np.zeros((h, w))
+    with open('tmp1.yuv', 'rb') as f:
+        yuv = np.fromfile(f, dtype='uint8')
+        y1 = yuv[0:w*h].reshape((h, w))
+
+    mosse.track_init(r, y1)
+
+    #dump2txt('dump.py.Ai.real', mosse.Ai.real)
+    #dump2txt('dump.py.Ai.imag', mosse.Ai.imag)
+    #dump2txt('dump.py.Bi.real', mosse.Bi.real)
+    #dump2txt('dump.py.Bi.imag', mosse.Bi.imag)
+
+    rw, rh = r[2], r[3]
+    tmpAi = np.zeros((rh, 2*rw))
+    tmpBi = np.zeros((rh, 2*rw))
+    tmpAi[:, 0::2] = mosse.Ai.real
+    tmpAi[:, 1::2] = mosse.Ai.imag
+    tmpBi[:, 0::2] = mosse.Bi.real
+    tmpBi[:, 1::2] = mosse.Bi.imag
+    dump2txt('dump.py.Ai', tmpAi)
+    dump2txt('dump.py.Bi', tmpBi)
+
+test_mosse_init()
 
 print('\ndone')
