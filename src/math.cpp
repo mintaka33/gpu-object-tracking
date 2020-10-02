@@ -114,23 +114,20 @@ void dft2d(const int M, const int N, float* f, float* F)
     }
 }
 
-unsigned char bilinear(float q11, float q12, float q21, float q22, float x1, float y1, float x2, float y2, float x, float y)
+float bilinear(float q11, float q12, float q21, float q22, float x1, float y1, float x2, float y2, float x, float y)
 {
     float r1, r2, p;
     r1 = (x2 - x)*q11 / (x2 - x1) + (x - x1)*q12 / (x2 - x1);
     r2 = (x2 - x)*q21 / (x2 - x1) + (x - x1)*q22 / (x2 - x1);
     p = (y2 - y)*r1 / (y2 - y1) + (y - y1)*r2 / (y2 - y1);
-
-    if (p < 0) return 0;
-    if (p > 255) return 255;
-    return (unsigned char)p;
+    return p;
 }
 
-void affine(char* src, int sw, int sh, char* dst, int dw, int dh, float m[3][3])
+void affine(float* src, int sw, int sh, float* dst, int dw, int dh, float m[3][3])
 {
     for (int j = 0; j < dh; j++) {
         for (int i = 0; i < dw; i++) {
-            unsigned char yp = 0;
+            float yp = 0;
             float x1, y1, x2, y2, x, y;
             float q11[3], q12[3], q21[3], q22[3];
             int x1i, y1i, x2i, y2i;
@@ -152,10 +149,10 @@ void affine(char* src, int sw, int sh, char* dst, int dw, int dh, float m[3][3])
             x2 = x1 + 1; x2i = (int)x2;
             y2 = y1 + 1; y2i = (int)y2;
 
-            q11[0] = (unsigned char)src[(y1i * sw + x1i)];
-            q12[0] = (unsigned char)src[(y1i * sw + x2i)];
-            q21[0] = (unsigned char)src[(y2i * sw + x1i)];
-            q22[0] = (unsigned char)src[(y2i * sw + x2i)];
+            q11[0] = src[(y1i * sw + x1i)];
+            q12[0] = src[(y1i * sw + x2i)];
+            q21[0] = src[(y2i * sw + x1i)];
+            q22[0] = src[(y2i * sw + x2i)];
             yp = bilinear(q11[0], q12[0], q21[0], q22[0], x1, y1, x2, y2, x, y);
 
             dst[(j * dw + i)] = yp;
@@ -163,7 +160,7 @@ void affine(char* src, int sw, int sh, char* dst, int dw, int dh, float m[3][3])
     }
 }
 
-void preproc(uint8_t* f, float* cos, float* dst, int w,  int h)
+void preproc(float* f, float* cos, float* dst, int w,  int h)
 {
     const float eps = 1e-5;
     for (size_t y = 0; y < h; y++)
@@ -215,15 +212,14 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
     dump2text("dump.cpp.Gauss-DFT.txt", G, 2 * r.w, r.h);
 
     // load original ROI
-    char* roi = new char[r.w * r.h];
+    float* roi = new float[r.w * r.h];
     for (size_t y = 0; y < r.h; y++) {
         for (size_t x = 0; x < r.w; x++) {
-            roi[y * r.w + x] = src[(y+r.y)*srcw + (x+r.x)];
+            roi[y * r.w + x] = (float(src[(y+r.y)*srcw + (x+r.x)]))/255;
         }
     }
-    dump2yuv(roi, r.w, r.h, 20);
 
-    char* fa = new char[r.w * r.h];
+    float* fa = new float[r.w * r.h];
     float* fi = new float[r.w * r.h];
     float* Fi = new float[2 * r.w * r.h];
     float angles[8] = { 0, -4.7, 3.8, -4.1, -0.9, 3.0, 0.5, -4.8 };
@@ -235,7 +231,7 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
             {      0,      0, 1 }
         };
 
-        memset(fa, 0, r.w * r.h);
+        memset(fa, 0, sizeof(float) * r.w * r.h);
 
         pu.startTick("affine");
         affine(roi, r.w, r.h, fa, r.w, r.h, m);
@@ -244,7 +240,7 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
         //dump2yuv(fa, r.w, r.h, i);
 
         pu.startTick("preproc");
-        preproc((uint8_t*)fa, cw, fi, r.w, r.h);
+        preproc(fa, cw, fi, r.w, r.h);
         pu.stopTick("preproc");
 
         pu.startTick("fi-dft2d");
@@ -273,8 +269,64 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
     delete[] roi, fi, fa, Fi;
 }
 
-void mosse_update(char* src, int srcw, int srch)
+void mosse_update(char* src, int srcw, int srch, Rect r)
 {
+    // Hi = Ai / Bi
+    float* Hi = new float[2 * r.w * r.h];
+    for (size_t y = 0; y < r.h; y++) {
+        for (size_t x = 0; x < r.w; x++) {
+            float a = Ai[y * 2 * r.w + 2 * x + 0];
+            float b = Ai[y * 2 * r.w + 2 * x + 1];
+            float c = Bi[y * 2 * r.w + 2 * x + 0];
+            float d = Bi[y * 2 * r.w + 2 * x + 1];
+            Hi[y * 2 * r.w + 2 * x + 0] = (a * c + b * d) / (c * c + d * d);
+            Hi[y * 2 * r.w + 2 * x + 1] = (b * c - a * d) / (c * c + d * d);
+        }
+    }
+
+    // Fi
+    float* fi = new float[r.w * r.h];
+    for (size_t y = 0; y < r.h; y++) {
+        for (size_t x = 0; x < r.w; x++) {
+            fi[y * r.w + x] = (float(src[(y + r.y) * srcw + (x + r.x)])) / 255;
+        }
+    }
+    float* fip = new float[r.w * r.h];
+    preproc(fi, cw, fip, r.w, r.h);
+    float* Fi = new float[2 * r.w * r.h];
+    dft2d(r.w, r.h, fip, Fi);
+
+    // Gi = Hi * Fi
+    float* Gi = new float[2 * r.w * r.h];
+    for (size_t y = 0; y < r.h; y++) {
+        for (size_t x = 0; x < r.w; x++) {
+            float a = Hi[y * 2 * r.w + 2 * x + 0];
+            float b = Hi[y * 2 * r.w + 2 * x + 1];
+            float c = Fi[y * 2 * r.w + 2 * x + 0];
+            float d = Fi[y * 2 * r.w + 2 * x + 1];
+            Gi[y * 2 * r.w + 2 * x + 0] = a*c - b*d;
+            Gi[y * 2 * r.w + 2 * x + 1] = a*d + b*c;
+        }
+    }
+
+    // gi = IDFT(Gi)
+    float* gi = new float[2 * r.w * r.h];
+    dft2d(r.w, r.h, Gi, gi);
+
+    float mx = 0, my = 0, max = gi[0];
+    for (size_t y = 0; y < r.h; y++) {
+        for (size_t x = 0; x < r.w; x++) {
+            if (gi[y * 2 * r.w + 2 * x + 0] > max) {
+                max = gi[y * 2 * r.w + 2 * x + 0];
+                mx = x;
+                my = y;
+            }
+        }
+    }
+
+    printf("INFO: mx = %d, my = %d\n", mx, my);
+
+    delete[] Hi, fi, fip, Fi, Gi, gi;
 
 }
 
@@ -357,7 +409,7 @@ void test_dft2d()
 void test_preproc()
 {
     const int w = 20, h = 10;
-    uint8_t* src = new uint8_t[w * h];
+    float* src = new float[w * h];
     float* dst = new float[w * h];
     float* cos = new float[w * h];
 
@@ -376,15 +428,22 @@ void test_preproc()
 void test_affine()
 {
     int srcw = 320, srch = 240;
-    char* src = new char[srcw * srch];
+    uint8_t* src = new uint8_t[srcw * srch];
     memset(src, 0, srcw * srch);
-    char* dst = nullptr;
+    float* srcf = new float[srcw * srch];
+    memset(srcf, 0, sizeof(float) * srcw * srch);
+    float* dst = nullptr;
     int dstw = 0, dsth = 0;
 
     ifstream infile;
     infile.open("test.yuv", ios::binary);
-    infile.read(src, srcw * srch);
+    infile.read((char*)src, srcw * srch);
     infile.close();
+    for (size_t y = 0; y < srch; y++) {
+        for (size_t x = 0; x < srcw; x++) {
+            srcf[y * srcw + x] = (float(src[y * srcw + x])) / 255; 
+        }
+    }
 
     // Translation
     int tx = 20;
@@ -396,9 +455,9 @@ void test_affine()
     };
     dstw = srcw;
     dsth = srch;
-    dst = new char[dstw * dsth];
-    affine(src, srcw, srch, dst, dstw, dsth, translation);
-    dump2yuv(dst, dstw, dsth, 1);
+    dst = new float[dstw * dsth];
+    affine(srcf, srcw, srch, dst, dstw, dsth, translation);
+    //dump2yuv(dst, dstw, dsth, 1);
     delete[] dst;
 
     // Scale
@@ -411,10 +470,10 @@ void test_affine()
     };
     dstw = srcw;
     dsth = srch;
-    dst = new char[dstw * dsth];
-    memset(dst, 0, dstw * dsth);
-    affine(src, srcw, srch, dst, dstw, dsth, scale);
-    dump2yuv(dst, dstw, dsth, 2);
+    dst = new float[dstw * dsth];
+    memset(dst, 0, sizeof(float) * dstw * dsth);
+    affine(srcf, srcw, srch, dst, dstw, dsth, scale);
+    //dump2yuv(dst, dstw, dsth, 2);
     delete[] dst;
 
     // Shear
@@ -427,9 +486,10 @@ void test_affine()
     };
     dstw = srcw;
     dsth = srch;
-    dst = new char[dstw * dsth];
-    affine(src, srcw, srch, dst, dstw, dsth, shear);
-    dump2yuv(dst, dstw, dsth, 3);
+    dst = new float[dstw * dsth];
+    memset(dst, 0, sizeof(float) * dstw * dsth);
+    affine(srcf, srcw, srch, dst, dstw, dsth, shear);
+    //dump2yuv(dst, dstw, dsth, 3);
     delete[] dst;
 
     // Rotation
@@ -441,9 +501,10 @@ void test_affine()
     };
     dstw = srcw;
     dsth = srch;
-    dst = new char[dstw * dsth];
-    affine(src, srcw, srch, dst, dstw, dsth, rotation);
-    dump2yuv(dst, dstw, dsth, 4);
+    dst = new float[dstw * dsth];
+    memset(dst, 0, sizeof(float) * dstw * dsth);
+    affine(srcf, srcw, srch, dst, dstw, dsth, rotation);
+    //dump2yuv(dst, dstw, dsth, 4);
     delete[] dst;
 
     delete[] src;
@@ -481,7 +542,7 @@ void test_mosse()
     infile.read(src, srcw * srch);
     infile.close();
 
-    mosse_update(src2, srcw, srch);
+    mosse_update(src2, srcw, srch, rect);
 
     delete[] cw, g, G, Ai, Bi;
     delete[] src, src2;
