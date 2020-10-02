@@ -154,14 +154,17 @@ def test4():
         cv2.imwrite('out.%02d.bmp'%i, warped)
     print('test4 finished')
 
-def test_mosse_init():
+def test_mosse():
     w, h = 640, 360
     r = [387, 198, 30, 62]
+    print('frame1 rect:', r)
     y1 = np.zeros((h, w))
     y2 = np.zeros((h, w))
     with open('tmp1.yuv', 'rb') as f:
         yuv = np.fromfile(f, dtype='uint8')
         y1 = yuv[0:w*h].reshape((h, w))
+    y1d = cv2.rectangle(y1, (r[0], r[1]), (r[0]+r[2], r[1]+r[3]), (255, 0, 0))
+    cv2.imwrite('tmp1.py.out.rect.bmp', y1d)
 
     mosse.track_init(r, y1)
 
@@ -184,6 +187,15 @@ def test_mosse_init():
     dump2txt('dump.py.Ai', tmpAi)
     dump2txt('dump.py.Bi', tmpBi)
 
-test_mosse_init()
+    with open('tmp2.yuv', 'rb') as f:
+        yuv = np.fromfile(f, dtype='uint8')
+        y2 = yuv[0:w*h].reshape((h, w))
+
+    bb = mosse.track_update(y2)
+    print('frame2 rect:', bb)
+    y2d = cv2.rectangle(y2, (bb[0], bb[1]), (bb[0]+bb[2], bb[1]+bb[3]), (255, 0, 0))
+    cv2.imwrite('tmp2.py.out.rect.bmp', y2d)
+
+test_mosse()
 
 print('\ndone')
