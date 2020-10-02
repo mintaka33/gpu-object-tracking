@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 
-Ai, Bi, G, cos = None, None, None, None
+Ai, Bi, G, cos, gauss = None, None, None, None, None
 x, y, w, h, center = None, None, None, None, None
 sigma = 2.0
 interp_factor = 0.125
@@ -36,7 +36,7 @@ def rand_warp(img):
     return warped
 
 def track_init(pos, frame):
-    global Ai, Bi, G, cos, x, y, w, h, center
+    global Ai, Bi, G, cos, gauss, x, y, w, h, center
     x, y, w, h = pos[0], pos[1], pos[2], pos[3]
     center = (x+w/2, y+h/2)
     cos = cos_window((w, h))

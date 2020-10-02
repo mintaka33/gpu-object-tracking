@@ -7,14 +7,22 @@ import mosse
 
 def dump2txt(filename, a):
     h, w = a.shape
+    if type(a[0][0]) is np.complex128:
+        cmpl = True
+        filename += '.%dx%d.txt'%(w*2, h)
+    else:
+        cmpl = False
+        filename += '.%dx%d.txt'%(w, h)
     outstr = []
     for y in range(h):
         line = ''
         for x in range(w):
-            line += '%14.4f, '%a[y][x]
+            if cmpl == True:
+                line += '%14.6f, %14.6f, '%(a[y][x].real, a[y][x].imag)
+            else:
+                line += '%14.6f, '%a[y][x]
         outstr.append(line+'\n')
 
-    filename += '.%dx%d.txt'%(w, h)
     with open(filename, 'wt') as f:
         for line in outstr:
             f.write(line)
@@ -156,6 +164,10 @@ def test_mosse_init():
         y1 = yuv[0:w*h].reshape((h, w))
 
     mosse.track_init(r, y1)
+
+    dump2txt('dump.py.cos', mosse.cos)
+    dump2txt('dump.py.gauss', mosse.gauss)
+    dump2txt('dump.py.G', mosse.G)
 
     #dump2txt('dump.py.Ai.real', mosse.Ai.real)
     #dump2txt('dump.py.Ai.imag', mosse.Ai.imag)

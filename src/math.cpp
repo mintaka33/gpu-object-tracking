@@ -36,7 +36,7 @@ void dump2text(string filename, float* data, const int w, const int h)
     ofstream of(filename);
     for (size_t y = 0; y < h; y++) {
         for (size_t x = 0; x < w; x++) {
-            sprintf_s(tmp, "%14.4f", data[x + w * y]);
+            sprintf_s(tmp, "%14.6f", data[x + w * y]);
             of << tmp << ", ";
         }
         of << endl;
@@ -81,7 +81,7 @@ void guassian2d(float* guass, const int w, const int h) {
     for (size_t y = 0; y < h; y++) {
         for (size_t x = 0; x < w; x++) {
             float ep = ((x-w/2) * (x-w/2) + (y-h/2)*(y-h/2))/(sigma * sigma);
-            guass[x + y * w] = c * exp(-0.5 * ep);
+            guass[x + y * w] = exp(-0.5 * ep);
         }
     }
 }
@@ -199,12 +199,14 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
     pu.startTick("cos2d");
     cos2d(cw, r.w, r.h);
     pu.stopTick("cos2d");
+    dump2text("dump.cpp.cos2d.txt", cw, r.w, r.h);
 
     // Gaussian target
     float* g = new float[r.w * r.h];
     pu.startTick("guassian2d");
     guassian2d(g, r.w, r.h);
     pu.stopTick("guassian2d");
+    dump2text("dump.cpp.guassian2d.txt", g, r.w, r.h);
 
     // DFT Gaussian target
     float* G = new float[2 * r.w * r.h];
@@ -212,6 +214,7 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
     pu.startTick("Gauss-DFT");
     dft2d(r.w, r.h, g, G);
     pu.stopTick("Gauss-DFT");
+    dump2text("dump.cpp.Gauss-DFT.txt", G, 2 * r.w, r.h);
 
     float* Ai = new float[2 * r.w * r.h];
     memset(Ai, 0, sizeof(float) * 2 * r.w * r.h);
@@ -263,10 +266,10 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
                 float gi = G[y * r.w * 2 + x * 2 + 1];
                 float fir = Fi[y * r.w * 2 + x * 2];
                 float fii = Fi[y * r.w * 2 + x * 2 + 1];
-                Ai[y * r.w * 2 + x * 2] = gr * fir + gi * fii;
-                Ai[y * r.w * 2 + x * 2 + 1] = gr * fii + gi * fir;
-                Bi[y * r.w * 2 + x * 2] = gr * gr + gi * gi;
-                Bi[y * r.w * 2 + x * 2 + 1] = 2 * gr * gi;
+                Ai[y * r.w * 2 + x * 2] += gr * fir + gi * fii;
+                Ai[y * r.w * 2 + x * 2 + 1] += gr * fii + gi * fir;
+                Bi[y * r.w * 2 + x * 2] += gr * gr + gi * gi;
+                Bi[y * r.w * 2 + x * 2 + 1] += 2 * gr * gi;
             }
         }
         pu.stopTick("Ai-Bi");
