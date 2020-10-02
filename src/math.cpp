@@ -189,37 +189,30 @@ void preproc(uint8_t* f, float* cos, float* dst, int w,  int h)
     }
 }
 
+float*cw, *g, *G, *Ai, *Bi;
+
 void mosse_init(char* src, int srcw, int srch, Rect r)
 {
     int cx = r.x + r.w / 2;
     int cy = r.y + r.h / 2;
 
     // Cosine window
-    float* cw = new float[r.w * r.h];
     pu.startTick("cos2d");
     cos2d(cw, r.w, r.h);
     pu.stopTick("cos2d");
     dump2text("dump.cpp.cos2d.txt", cw, r.w, r.h);
 
     // Gaussian target
-    float* g = new float[r.w * r.h];
     pu.startTick("guassian2d");
     guassian2d(g, r.w, r.h);
     pu.stopTick("guassian2d");
     dump2text("dump.cpp.guassian2d.txt", g, r.w, r.h);
 
     // DFT Gaussian target
-    float* G = new float[2 * r.w * r.h];
-    memset(G, 0, sizeof(float) * r.w * r.h);
     pu.startTick("Gauss-DFT");
     dft2d(r.w, r.h, g, G);
     pu.stopTick("Gauss-DFT");
     dump2text("dump.cpp.Gauss-DFT.txt", G, 2 * r.w, r.h);
-
-    float* Ai = new float[2 * r.w * r.h];
-    memset(Ai, 0, sizeof(float) * 2 * r.w * r.h);
-    float* Bi = new float[2 * r.w * r.h];
-    memset(Bi, 0, sizeof(float) * 2 * r.w * r.h);
 
     // load original ROI
     char* roi = new char[r.w * r.h];
@@ -278,7 +271,7 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
     dump2text("dump.cpp.Ai.txt", Ai, 2 * r.w, r.h);
     dump2text("dump.cpp.Bi.txt", Bi, 2 * r.w, r.h);
 
-    delete[] roi;
+    delete[] roi, fi, fa, Fi;
 }
 
 void mosse_update()
@@ -460,6 +453,8 @@ void test_affine()
 void test_mosse()
 {
     int srcw = 640, srch = 360;
+    Rect rect = { 387, 198, 30, 62 };
+
     char* src = new char[srcw * srch];
     memset(src, 0, srcw * srch);
 
@@ -467,12 +462,22 @@ void test_mosse()
     infile.open("tmp1.yuv", ios::binary);
     infile.read(src, srcw * srch);
     infile.close();
-
     //dump2yuv(src, srcw, srch, 1);
 
-    Rect rect = { 387, 198, 30, 62 };
+    cw = new float[rect.w * rect.h];
+    g = new float[rect.w * rect.h];
+    G = new float[2 * rect.w * rect.h];
+    Ai = new float[2 * rect.w * rect.h];
+    Bi = new float[2 * rect.w * rect.h];
+    memset(cw, 0, sizeof(float) * rect.w * rect.h);
+    memset(g, 0, sizeof(float) * rect.w * rect.h);
+    memset(G, 0, sizeof(float) * 2 * rect.w * rect.h);
+    memset(Ai, 0, sizeof(float) * 2 * rect.w * rect.h);
+    memset(Bi, 0, sizeof(float) * 2 * rect.w * rect.h);
+
     mosse_init(src, srcw, srch, rect);
 
+    delete[] cw, g, G, Ai, Bi;
     delete[] src;
     return;
 }
