@@ -226,7 +226,6 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
     char* fa = new char[r.w * r.h];
     float* fi = new float[r.w * r.h];
     float* Fi = new float[2 * r.w * r.h];
-
     float angles[8] = { 0, -4.7, 3.8, -4.1, -0.9, 3.0, 0.5, -4.8 };
     for (size_t i = 0; i < 8; i++) {
         float d = angles[i] * (PI / 180);
@@ -274,7 +273,7 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
     delete[] roi, fi, fa, Fi;
 }
 
-void mosse_update()
+void mosse_update(char* src, int srcw, int srch)
 {
 
 }
@@ -477,8 +476,15 @@ void test_mosse()
 
     mosse_init(src, srcw, srch, rect);
 
+    char* src2 = new char[srcw * srch];
+    infile.open("tmp2.yuv", ios::binary);
+    infile.read(src, srcw * srch);
+    infile.close();
+
+    mosse_update(src2, srcw, srch);
+
     delete[] cw, g, G, Ai, Bi;
-    delete[] src;
+    delete[] src, src2;
     return;
 }
 
