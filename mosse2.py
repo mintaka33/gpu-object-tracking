@@ -21,6 +21,20 @@ def divSpec(A, B):
     C = np.dstack([np.real(C), np.imag(C)]).copy()
     return C
 
+def gaussian2(w, h, sigma=2.0):
+    xs, ys = np.meshgrid(np.arange(w), np.arange(h))
+    center_x, center_y = w / 2, h / 2
+    dist = ((xs - center_x) ** 2 + (ys - center_y) ** 2) / (sigma**2)
+    g = np.exp(-0.5*dist).astype(np.float32)
+    return g
+
+def gaussian(w, h):
+    g = np.zeros((h, w), np.float32)
+    g[h//2, w//2] = 1
+    g = cv2.GaussianBlur(g, (-1, -1), 2.0)
+    g /= g.max()
+    return g
+
 eps = 1e-5
 
 class MOSSE:
@@ -33,10 +47,7 @@ class MOSSE:
         img = cv2.getRectSubPix(frame, (w, h), (x, y))
 
         self.win = cv2.createHanningWindow((w, h), cv2.CV_32F)
-        g = np.zeros((h, w), np.float32)
-        g[h//2, w//2] = 1
-        g = cv2.GaussianBlur(g, (-1, -1), 2.0)
-        g /= g.max()
+        g = gaussian2(w, h)
 
         self.G = cv2.dft(g, flags=cv2.DFT_COMPLEX_OUTPUT)
         self.H1 = np.zeros_like(self.G)
