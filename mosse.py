@@ -37,6 +37,18 @@ def rand_warp(img):
     warped = cv2.warpAffine(img, W, (w, h), cv2.BORDER_REFLECT)
     return warped
 
+def rand_warp2(a):
+    h, w = a.shape[:2]
+    T = np.zeros((2, 3))
+    coef = 0.2
+    ang = (np.random.rand()-0.5)*coef
+    c, s = np.cos(ang), np.sin(ang)
+    T[:2, :2] = [[c,-s], [s, c]]
+    T[:2, :2] += (np.random.rand(2, 2) - 0.5)*coef
+    c = (w/2, h/2)
+    T[:,2] = c - np.dot(T[:2, :2], c)
+    return cv2.warpAffine(a, T, (w, h), borderMode = cv2.BORDER_REFLECT)
+
 def track_init(pos, frame):
     global Ai, Bi, G, cos, gauss, x, y, w, h, center
     x, y, w, h = pos[0], pos[1], pos[2], pos[3]
@@ -72,6 +84,7 @@ def track_update(frame):
     xc, yc = center
     xc += dx
     yc += dy
+    x, y = (x+dx, y+dy)
     center = (xc, yc)
     f_rect = cv2.getRectSubPix(img2, (w, h), center)
     Fi = np.fft.fft2(preprocessing(f_rect, cos))
