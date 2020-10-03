@@ -2,13 +2,8 @@
 
 #include "perf.h"
 #include "mosse.h"
-PerfUtil pu;
 
-struct Buf2D {
-    char* buf;
-    int w;
-    int h;
-};
+PerfUtil pfu;
 
 int main() 
 {

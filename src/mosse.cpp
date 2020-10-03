@@ -1,18 +1,12 @@
 #pragma once
 #include "mosse.h"
 
+#define PI 3.14159265
+
 const int maxSize = 4096;
 
-inline void freeArray(void *p)
-{
-    if (!p) {
-        delete[] p;
-        p = nullptr;
-    }
-}
-
 template <class T>
-T* allocZero(int size) 
+T* allocArray(int size)
 {
     T* p = new T[size];
     if (!p)
@@ -22,6 +16,48 @@ T* allocZero(int size)
     return p;
 }
 
+inline void freeArray(void *p)
+{
+    if (!p) {
+        delete[] p;
+        p = nullptr;
+    }
+}
+
+void hanning(const int m, double* d)
+{
+    for (size_t i = 0; i < m; i++) {
+        d[i] = 0.5 - 0.5 * cos(2 * PI * i / (m - 1));
+    }
+}
+
+void cosWindow(double* cos, const int w, const int h)
+{
+    double* cos_w = new double[w];
+    double* cos_h = new double[h];
+    hanning(w, cos_w);
+    hanning(h, cos_h);
+
+    for (size_t y = 0; y < h; y++) {
+        for (size_t x = 0; x < w; x++) {
+            cos[x + w * y] = sqrt(cos_h[y] * cos_w[x]);
+        }
+    }
+    delete[] cos_w;
+    delete[] cos_h;
+}
+
+void guassian2d(double* guass, const int w, const int h, double sigma = 2.0)
+{
+    double c = 1 / (2 * PI * sigma * sigma);
+    for (size_t y = 0; y < h; y++) {
+        for (size_t x = 0; x < w; x++) {
+            double ep = ((x - w / 2) * (x - w / 2) + (y - h / 2) * (y - h / 2)) / (sigma * sigma);
+            guass[x + y * w] = exp(-0.5 * ep);
+        }
+    }
+}
+
 Mosse::Mosse(int w, int h):
     w(w), h(h)
 {
@@ -29,16 +65,20 @@ Mosse::Mosse(int w, int h):
         return;
 
     int sz = w * h;
+    cos = allocArray<double>(sz);
+    g = allocArray<double>(sz);
+
     int sz2 = sz * 2; // size of complex number array
+    G = allocArray<double>(sz2);
+    H = allocArray<double>(sz2);
+    H1 = allocArray<double>(sz2);
+    H2 = allocArray<double>(sz2);
 
-    cos = allocZero<double>(sz2);
-    G = allocZero<double>(sz2);
-    H = allocZero<double>(sz2);
-    H1 = allocZero<double>(sz2);
-    H2 = allocZero<double>(sz2);
-
-    if (!cos || !G || !H1 || !H2 || !H)
+    if (!cos || !g || !G || !H1 || !H2 || !H)
         return;
+
+    cosWindow(cos, w, h);
+    guassian2d(g, w, h);
 
     initStatus = true;
 }
@@ -62,4 +102,3 @@ int Mosse::update(char* frame, Rect& out)
 {
     return 0;
 }
-
