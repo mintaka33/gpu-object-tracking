@@ -68,7 +68,7 @@ void cos2d(float* cos, const int w, const int h) {
 
     for (size_t y = 0; y < h; y++) {
         for (size_t x = 0; x < w; x++) {
-            cos[x + w*y] = cos_h[y] * cos_w[x];
+            cos[x + w*y] = sqrt(cos_h[y] * cos_w[x]);
         }
     }
     delete[] cos_w;

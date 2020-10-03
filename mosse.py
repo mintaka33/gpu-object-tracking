@@ -8,6 +8,8 @@ interp_factor = 0.125
 
 def cos_window(sz):
     cos_window = np.hanning(int(sz[1]))[:, np.newaxis].dot(np.hanning(int(sz[0]))[np.newaxis, :])
+    cos_window = np.sqrt(cos_window)
+    #cos_window = cv2.createHanningWindow(sz, cv2.CV_64F)
     return cos_window
 
 def gaussian2d_labels(w, h, sigma):

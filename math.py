@@ -196,6 +196,14 @@ def test_mosse():
     y2d = cv2.rectangle(y2, (bb[0], bb[1]), (bb[0]+bb[2], bb[1]+bb[3]), (255, 0, 0))
     cv2.imwrite('tmp2.py.out.rect.bmp', y2d)
 
+def test_affine():
+    w, h = 30, 62
+    img = np.arange(w*h).reshape((h, w)).astype(np.float64)
+    out0 = mosse.rand_warp2(img, 0)
+    print('finish')
+
 test_mosse()
+
+#test_affine()
 
 print('\ndone')
