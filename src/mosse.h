@@ -1,9 +1,4 @@
 #pragma once
-#include <string>
-#include <fstream>
-#include <iostream>
-#include <complex>
-#include <iomanip>
 
 #include <stdio.h>
 #include <math.h>

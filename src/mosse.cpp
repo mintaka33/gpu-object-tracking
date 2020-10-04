@@ -1,4 +1,12 @@
 #pragma once
+#include <string>
+#include <fstream>
+#include <iostream>
+#include <complex>
+#include <iomanip>
+
+#include <complex.h>
+
 #include "mosse.h"
 
 #define PI 3.14159265
@@ -58,6 +66,23 @@ void guassian2d(double* guass, const int w, const int h, double sigma = 2.0)
     }
 }
 
+void dft2d(const int M, const int N, double* f, double* F)
+{
+    for (size_t v = 0; v < N; v++) {
+        for (size_t u = 0; u < M; u++) {
+            std::complex<double> sum = 0;
+            for (size_t y = 0; y < N; y++) {
+                for (size_t x = 0; x < M; x++) {
+                    double tmp = (u * x / (double)M + v * y / (double)N);
+                    sum += f[y * M + x] * exp(std::complex<double>(0, -(2 * PI) * tmp));
+                }
+            }
+            F[v * M * 2 + 2 * u + 0] = sum.real();
+            F[v * M * 2 + 2 * u + 1] = sum.imag();
+        }
+    }
+}
+
 Mosse::Mosse(int w, int h):
     w(w), h(h)
 {
@@ -79,6 +104,7 @@ Mosse::Mosse(int w, int h):
 
     cosWindow(cos, w, h);
     guassian2d(g, w, h);
+    dft2d(w, h, g, G);
 
     initStatus = true;
 }
