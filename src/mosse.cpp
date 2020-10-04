@@ -7,6 +7,7 @@
 
 #include <complex.h>
 
+#include "perf.h"
 #include "mosse.h"
 
 #define PI 3.14159265
@@ -41,6 +42,8 @@ void hanning(const int m, double* d)
 
 void cosWindow(double* cos, const int w, const int h)
 {
+    PFU_ENTER;
+
     double* cos_w = new double[w];
     double* cos_h = new double[h];
     hanning(w, cos_w);
@@ -53,10 +56,14 @@ void cosWindow(double* cos, const int w, const int h)
     }
     delete[] cos_w;
     delete[] cos_h;
+
+    PFU_LEAVE;
 }
 
 void guassian2d(double* guass, const int w, const int h, double sigma = 2.0)
 {
+    PFU_ENTER;
+
     double c = 1 / (2 * PI * sigma * sigma);
     for (size_t y = 0; y < h; y++) {
         for (size_t x = 0; x < w; x++) {
@@ -64,10 +71,14 @@ void guassian2d(double* guass, const int w, const int h, double sigma = 2.0)
             guass[x + y * w] = exp(-0.5 * ep);
         }
     }
+
+    PFU_LEAVE;
 }
 
 void dft2d(const int M, const int N, double* f, double* F)
 {
+    PFU_ENTER;
+
     for (size_t v = 0; v < N; v++) {
         for (size_t u = 0; u < M; u++) {
             std::complex<double> sum = 0;
@@ -81,6 +92,8 @@ void dft2d(const int M, const int N, double* f, double* F)
             F[v * M * 2 + 2 * u + 1] = sum.imag();
         }
     }
+
+    PFU_LEAVE;
 }
 
 Mosse::Mosse(int w, int h):

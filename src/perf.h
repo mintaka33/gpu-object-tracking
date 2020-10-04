@@ -57,3 +57,6 @@ private:
 
 #define PFU_START(tag) PerfUtil::getInstance().startTick(tag)
 #define PFU_STOP(tag)  PerfUtil::getInstance().stopTick(tag)
+
+#define PFU_ENTER PerfUtil::getInstance().startTick(__FUNCTION__)
+#define PFU_LEAVE PerfUtil::getInstance().stopTick(__FUNCTION__)
