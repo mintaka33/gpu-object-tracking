@@ -15,8 +15,6 @@ using namespace std;
 
 #define PI 3.14159265
 
-PerfUtil pu;
-
 struct Rect {
     int x;
     int y;
@@ -194,21 +192,21 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
     int cy = r.y + r.h / 2;
 
     // Cosine window
-    pu.startTick("cos2d");
+    PFU_START("cos2d");
     cos2d(cw, r.w, r.h);
-    pu.stopTick("cos2d");
+    PFU_STOP("cos2d");
     dump2text("dump.cpp.cos2d.txt", cw, r.w, r.h);
 
     // Gaussian target
-    pu.startTick("guassian2d");
+    PFU_START("guassian2d");
     guassian2d(g, r.w, r.h);
-    pu.stopTick("guassian2d");
+    PFU_STOP("guassian2d");
     dump2text("dump.cpp.guassian2d.txt", g, r.w, r.h);
 
     // DFT Gaussian target
-    pu.startTick("Gauss-DFT");
+    PFU_START("Gauss-DFT");
     dft2d(r.w, r.h, g, G);
-    pu.stopTick("Gauss-DFT");
+    PFU_STOP("Gauss-DFT");
     dump2text("dump.cpp.Gauss-DFT.txt", G, 2 * r.w, r.h);
 
     // load original ROI
@@ -233,21 +231,21 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
 
         memset(fa, 0, sizeof(float) * r.w * r.h);
 
-        pu.startTick("affine");
+        PFU_START("affine");
         affine(roi, r.w, r.h, fa, r.w, r.h, m);
-        pu.stopTick("affine");
+        PFU_STOP("affine");
 
         //dump2yuv(fa, r.w, r.h, i);
 
-        pu.startTick("preproc");
+        PFU_START("preproc");
         preproc(fa, cw, fi, r.w, r.h);
-        pu.stopTick("preproc");
+        PFU_STOP("preproc");
 
-        pu.startTick("fi-dft2d");
+        PFU_START("fi-dft2d");
         dft2d(r.w, r.h, fi, Fi);
-        pu.stopTick("fi-dft2d");
+        PFU_STOP("fi-dft2d");
 
-        pu.startTick("Ai-Bi");
+        PFU_START("Ai-Bi");
         for (size_t y = 0; y < r.h; y++) {
             for (size_t x = 0; x < r.w; x++) {
                 float gr = G[y * r.w * 2 + x * 2];
@@ -260,7 +258,7 @@ void mosse_init(char* src, int srcw, int srch, Rect r)
                 Bi[y * r.w * 2 + x * 2 + 1] += 2 * gr * gi;
             }
         }
-        pu.stopTick("Ai-Bi");
+        PFU_STOP("Ai-Bi");
     }
 
     dump2text("dump.cpp.Ai.txt", Ai, 2 * r.w, r.h);
@@ -336,13 +334,12 @@ void test_cos2d()
     float* cos = new float[h * w];
 
     for (size_t i = 0; i < 100; i++) {
-        pu.startTick("cos2d");
+        PFU_START("cos2d");
         cos2d(cos, w, h);
-        pu.stopTick("cos2d");
+        PFU_STOP("cos2d");
         printf("-");
     }
 
-    pu.savePerfData();
     delete[] cos;
 }
 
@@ -352,14 +349,13 @@ void test_guass()
     float* guass = new float[h * w];
 
     for (size_t i = 0; i < 100; i++) {
-        pu.startTick("guass2d");
+        PFU_START("guass2d");
         guassian2d(guass, w, h);
-        pu.stopTick("guass2d");
+        PFU_STOP("guass2d");
         printf("-");
     }
 
     dump2text("guass.csv", guass, w, h);
-    pu.savePerfData();
     delete[] guass;
 }
 
@@ -374,9 +370,9 @@ void test_dft()
 
     for (size_t i = 0; i < 1; i++)
     {
-        pu.startTick("dft");
+        PFU_START("dft");
         dft(N, x, w);
-        pu.stopTick("dft");
+        PFU_STOP("dft");
     }
 
     dump2text("dft.txt", w, 64, 64);
@@ -396,9 +392,9 @@ void test_dft2d()
 
     for (size_t i = 0; i < 10; i++)
     {
-        pu.startTick("dft-2d");
+        PFU_START("dft-2d");
         dft2d(w, h, f, F);
-        pu.stopTick("dft-2d");
+        PFU_STOP("dft-2d");
     }
 
     dump2text("dft2d.txt", F, w, h);

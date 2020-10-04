@@ -31,6 +31,12 @@ public:
     PerfUtil();
     ~PerfUtil();
 
+    static PerfUtil& getInstance() 
+    {
+        static PerfUtil instance;
+        return instance;
+    }
+
     void startTick(std::string tag);
     void stopTick(std::string tag);
     void savePerfData();
@@ -48,3 +54,6 @@ private:
 private:
     std::map<std::string, std::vector<Tick>*> records;
 };
+
+#define PFU_START(tag) PerfUtil::getInstance().startTick(tag)
+#define PFU_STOP(tag)  PerfUtil::getInstance().stopTick(tag)
