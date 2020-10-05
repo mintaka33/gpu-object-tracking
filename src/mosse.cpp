@@ -113,10 +113,44 @@ int Mosse::init(char* frame, int pw, int ph, const Rect r)
 
     for (size_t i = 0; i < affineNum; i++) {
         double m[2][3] = {};
-        genMatrix(w, h, m[0]);
+        getMatrix(w, h, m[0]);
+
         memset(fa, 0, sizeof(double) * w * h);
         affine(f, w, h, fa, w, h, m);
+
         preproc(fa, cos, fi, w, h);
+
+        dft2d(w, h, fi, Fi);
+
+        // calculate H1, H2
+        for (size_t j = 0; j < h; j++) {
+            for (size_t i = 0; i < w; i++) {
+                // H1 += G * np.conj(Fi)
+                // H2 += Fi * np.conj(Fi)
+                double a =  G[j * w * 2 + i * 2 + 0];
+                double b =  G[j * w * 2 + i * 2 + 1];
+                double c = Fi[j * w * 2 + i * 2 + 0];
+                double d = Fi[j * w * 2 + i * 2 + 1];
+                // (a+bi)*(c-di) = (ac + bd) + (bc-ad)i
+                H1[j * w * 2 + i * 2 + 0] += a * c + b * d;
+                H1[j * w * 2 + i * 2 + 1] += b * c - a * d;
+                // (c+di)*(c-di) = (cc+dd)i
+                H2[j * w * 2 + i * 2 + 0] += c * c + d * d;
+                H2[j * w * 2 + i * 2 + 1] += 0;
+            }
+        }
+    }
+
+    // calculate H = H1 / H2
+    for (size_t j = 0; j < h; j++) {
+        for (size_t i = 0; i < w; i++) {
+            double a = H1[j * 2 * w + 2 * i + 0];
+            double b = H1[j * 2 * w + 2 * i + 1];
+            double c = H2[j * 2 * w + 2 * i + 0];
+            double d = H2[j * 2 * w + 2 * i + 1];
+            H[j * 2 * w + 2 * i + 0] = (a * c + b * d) / (c * c + d * d);
+            H[j * 2 * w + 2 * i + 1] = (b * c - a * d) / (c * c + d * d);
+        }
     }
 
     initStatus = true;
@@ -134,8 +168,15 @@ void Mosse::dump()
     dump2text("cos", cos, w, h, dumpIndex);
     dump2text("g", g, w, h, dumpIndex);
     dump2text("f", f, w, h, dumpIndex);
+    dump2text("fa", fa, w, h, dumpIndex);
+    dump2text("fi", fi, w, h, dumpIndex);
 
-    dump2text("G", G, 2 * w, h, dumpIndex);
+    dump2text("G",  G,  2 * w, h, dumpIndex);
+    dump2text("Fi", Fi, 2 * w, h, dumpIndex);
+    dump2text("H1", H1, 2 * w, h, dumpIndex);
+    dump2text("H2", H2, 2 * w, h, dumpIndex);
+    dump2text("H",  H,  2 * w, h, dumpIndex);
+
     dumpIndex++;
 }
 

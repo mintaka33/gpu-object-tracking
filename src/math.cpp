@@ -70,7 +70,7 @@ void dft2d(const int M, const int N, double* f, double* F)
     PFU_LEAVE;
 }
 
-void genMatrix(int w, int h, double* mat)
+void getMatrix(int w, int h, double* mat)
 {
     double r[5] = {};
     srand(time(NULL));
