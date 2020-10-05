@@ -9,10 +9,10 @@ def dump2txt(filename, a):
     h, w = a.shape
     if type(a[0][0]) is np.complex128:
         cmpl = True
-        filename += '.%dx%d.txt'%(w*2, h)
+        filename += '.py.%dx%d.txt'%(w*2, h)
     else:
         cmpl = False
-        filename += '.%dx%d.txt'%(w, h)
+        filename += '.py.%dx%d.txt'%(w, h)
     outstr = []
     for y in range(h):
         line = ''
@@ -47,11 +47,6 @@ def guassian2d():
     center_x, center_y = w / 2, h / 2
     dist = ((xs - center_x) ** 2 + (ys - center_y) ** 2) / (sigma**2)
     labels = np.exp(-0.5*dist)
-
-    np.savetxt('e:\\xs.csv', xs, delimiter=',')
-    np.savetxt('e:\\ys.csv', ys, delimiter=',')
-    np.savetxt('e:\\dist.csv', dist, delimiter=',')
-    np.savetxt('e:\\labels.csv', labels, delimiter=',')
 
 def dft():
     a = [1.0, 2.0, 3.0, 4.0]
@@ -202,8 +197,31 @@ def test_affine():
     out0 = mosse.rand_warp2(img, 0)
     print('finish')
 
-test_mosse()
+def cos_window(sz):
+    #cos_window = np.hanning(int(sz[1]))[:, np.newaxis].dot(np.hanning(int(sz[0]))[np.newaxis, :])
+    #cos_window = np.sqrt(cos_window)
+    cos_window = cv2.createHanningWindow(sz, cv2.CV_64F)
+    return cos_window
 
+def gaussian2d_labels(w, h, sigma):
+    xs, ys = np.meshgrid(np.arange(w), np.arange(h))
+    center_x, center_y = w / 2, h / 2
+    dist = ((xs - center_x) ** 2 + (ys - center_y) ** 2) / (sigma**2)
+    labels = np.exp(-0.5*dist)
+    return labels
+
+w, h = 30, 62
+cos = cos_window((w, h))
+dump2txt('cos', cos)
+
+g = gaussian2d_labels(w, h, 2.0)
+dump2txt('g', g)
+
+G = np.fft.fft2(g)
+dump2txt('G', G)
+
+
+#test_mosse()
 #test_affine()
 
 print('\ndone')

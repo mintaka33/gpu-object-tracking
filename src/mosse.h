@@ -14,7 +14,7 @@ struct Rect {
 class Mosse
 {
 public:
-    Mosse(int w, int h);
+    Mosse();
     ~Mosse();
 
     int init(char* frame, const Rect r);
@@ -31,6 +31,9 @@ private:
     double* cos = nullptr;
     double* g = nullptr;
     double* G = nullptr;
+    double* f = nullptr;
+    double* fi = nullptr;
+    double* Fi = nullptr;
     double* H1 = nullptr;
     double* H2 = nullptr;
     double* H = nullptr;

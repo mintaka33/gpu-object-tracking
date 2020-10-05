@@ -54,36 +54,18 @@ inline void freeArray(void *p)
     }
 }
 
-Mosse::Mosse(int w, int h):
-    w(w), h(h)
+Mosse::Mosse()
 {
-    if (w<1 || h<1 || w>maxSize || h>maxSize)
-        return;
 
-    int sz = w * h;
-    cos = allocArray<double>(sz);
-    g = allocArray<double>(sz);
-
-    int sz2 = sz * 2; // size of complex number array
-    G = allocArray<double>(sz2);
-    H = allocArray<double>(sz2);
-    H1 = allocArray<double>(sz2);
-    H2 = allocArray<double>(sz2);
-
-    if (!cos || !g || !G || !H1 || !H2 || !H)
-        return;
-
-    cosWindow(cos, w, h);
-    guassian2d(g, w, h);
-    dft2d(w, h, g, G);
-
-    initStatus = true;
 }
 
 Mosse::~Mosse()
 {
     freeArray(curImg);
     freeArray(cos);
+    freeArray(f);
+    freeArray(fi);
+    freeArray(Fi);
     freeArray(G);
     freeArray(H);
     freeArray(H1);
@@ -92,6 +74,41 @@ Mosse::~Mosse()
 
 int Mosse::init(char* frame, const Rect r)
 {
+    w = r.w;
+    h = r.h;
+
+    if (w<1 || h<1 || w>maxSize || h>maxSize)
+        return -1;
+
+    int sz = w * h;
+    cos = allocArray<double>(sz);
+    g = allocArray<double>(sz);
+    f = allocArray<double>(sz);
+    fi = allocArray<double>(sz);
+
+    int sz2 = sz * 2; // size of complex number array
+    G = allocArray<double>(sz2);
+    H = allocArray<double>(sz2);
+    H1 = allocArray<double>(sz2);
+    H2 = allocArray<double>(sz2);
+    Fi = allocArray<double>(sz2);
+
+    if (!cos || !g || !G || !H1 || !H2 || !H)
+        return -1;
+
+    cosWindow(cos, w, h);
+    guassian2d(g, w, h);
+    dft2d(w, h, g, G);
+
+    // load ROI and normalization
+    for (size_t j = 0; j < h; j++) {
+        for (size_t i = 0; i < w; i++) {
+            f[j * w + i] = (double((uint8_t)frame[(j + y) * w + (i + x)])) / 255;
+        }
+    }
+
+    initStatus = true;
+
     return 0;
 }
 
@@ -104,6 +121,8 @@ void Mosse::dump()
 {
     dump2text("cos", cos, w, h, dumpIndex);
     dump2text("g", g, w, h, dumpIndex);
+    dump2text("f", f, w, h, dumpIndex);
+
     dump2text("G", G, 2 * w, h, dumpIndex);
     dumpIndex++;
 }
