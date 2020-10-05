@@ -2,4 +2,5 @@ build
 *.bmp
 *.yuv
 *.txt
+*.265
 __pycache__
