@@ -127,7 +127,7 @@ int Mosse::init(char* frame, int pw, int ph, const Rect r)
     }
 
     for (size_t i = 0; i < affineNum; i++) {
-        double m[2][3] = { 1.027946, 0.003986, -0.542760, -0.142644, 1.008884, 1.864269 };
+        double m[2][3] = {}; // { 1.027946, 0.003986, -0.542760, -0.142644, 1.008884, 1.864269 };
         getMatrix(w, h, m[0]);
 
         memset(fa, 0, sizeof(double) * w * h);
