@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 
-Ai, Bi, G, cos, gauss = None, None, None, None, None
+Ai, Bi, G, cos, gauss, f_rect = None, None, None, None, None, None
 x, y, w, h, center = None, None, None, None, None
 sigma = 2.0
 interp_factor = 0.125
@@ -47,10 +47,11 @@ def rand_warp2(a):
     T[:2, :2] += (np.random.rand(2, 2) - 0.5)*coef
     c = (w/2, h/2)
     T[:,2] = c - np.dot(T[:2, :2], c)
+    #T = np.array([[1.027946, 0.003986, -0.542760], [-0.142644, 1.008884, 1.864269]])
     return cv2.warpAffine(a, T, (w, h), borderMode = cv2.BORDER_REFLECT)
 
 def track_init(pos, frame):
-    global Ai, Bi, G, cos, gauss, x, y, w, h, center
+    global Ai, Bi, G, cos, gauss, x, y, w, h, center, f_rect
     x, y, w, h = pos[0], pos[1], pos[2], pos[3]
     center = (x+w/2, y+h/2)
     cos = cos_window((w, h))
@@ -62,16 +63,17 @@ def track_init(pos, frame):
 
     # Load an color image in grayscale
     img1 = frame.astype(np.float32)/255
-    f_rect = cv2.getRectSubPix(img1, (w, h), center)
+    #f_rect = cv2.getRectSubPix(img1, (w, h), center)
+    f_rect = img1[y:y+h, x:x+w]
 
     for _ in range(8):
-        fi = rand_warp(f_rect)
+        fi = rand_warp2(f_rect)
         Fi = np.fft.fft2(preprocessing(fi, cos))
         Ai += G * np.conj(Fi)
         Bi += Fi * np.conj(Fi)
 
 def track_update(frame):
-    global Ai, Bi, G, cos, x, y, w, h, center
+    global Ai, Bi, G, cos, x, y, w, h, center, f_rect
     img2 = frame.astype(np.float32)/255
     Hi = Ai/Bi
     fi = cv2.getRectSubPix(img2, (w, h), center)
