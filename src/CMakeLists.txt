@@ -4,5 +4,5 @@ project(mosse)
 
 set (CMAKE_CXX_STANDARD 11)
 
-add_executable(math math.cpp perf.cpp perf.h)
-add_executable(mosse main.cpp perf.cpp perf.h mosse.cpp mosse.h)
+add_executable(test test.cpp perf.cpp perf.h)
+add_executable(mosse main.cpp perf.cpp perf.h mosse.cpp mosse.h math.cpp math.h)

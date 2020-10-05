@@ -3,9 +3,6 @@
 #include "perf.h"
 #include "mosse.h"
 
-//PerfUtil pfu;
-
-
 int main() 
 {
     PFU_START("Total");
