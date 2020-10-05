@@ -1,6 +1,7 @@
 #include <complex>
 #include <iomanip>
 #include <complex.h>
+#include <time.h>
 
 #include "math.h"
 #include "perf.h"
@@ -68,3 +69,29 @@ void dft2d(const int M, const int N, double* f, double* F)
 
     PFU_LEAVE;
 }
+
+void genMatrix(int w, int h, double* mat)
+{
+    double r[5] = {};
+    srand(time(NULL));
+    for (size_t i = 0; i < 5; i++) {
+        r[i] = (((double)rand() / (RAND_MAX)) - 0.5) * 0.2; // (-0.1, 0.1)
+    }
+
+    double c = cos(r[0]);
+    double s = sin(r[0]);
+    double m[2][3] = {};
+    m[0][0] = c + r[1];
+    m[0][1] = -s + r[2];
+    m[1][0] = s + r[3];
+    m[1][1] = c + r[4];
+    double c1 = w / 2.0, c2 = h / 2.0;
+    double t1 = m[0][0] * c1 + m[0][1] * c2;
+    double t2 = m[1][0] * c1 + m[1][1] * c2;
+    m[0][2] = c1 - t1;
+    m[1][2] = c2 - t2;
+
+    mat[0] = m[0][0], mat[1] = m[0][1], mat[2] = m[0][2];
+    mat[3] = m[1][0], mat[4] = m[1][1], mat[5] = m[1][2];
+}
+
