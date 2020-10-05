@@ -64,6 +64,7 @@ Mosse::~Mosse()
     freeArray(curImg);
     freeArray(cos);
     freeArray(f);
+    freeArray(fa);
     freeArray(fi);
     freeArray(Fi);
     freeArray(G);
@@ -72,8 +73,10 @@ Mosse::~Mosse()
     freeArray(H2);
 }
 
-int Mosse::init(char* frame, const Rect r)
+int Mosse::init(char* frame, int pw, int ph, const Rect r)
 {
+    picW = pw;
+    picH = ph;
     w = r.w;
     h = r.h;
 
@@ -84,6 +87,7 @@ int Mosse::init(char* frame, const Rect r)
     cos = allocArray<double>(sz);
     g = allocArray<double>(sz);
     f = allocArray<double>(sz);
+    fa = allocArray<double>(sz);
     fi = allocArray<double>(sz);
 
     int sz2 = sz * 2; // size of complex number array
@@ -103,8 +107,16 @@ int Mosse::init(char* frame, const Rect r)
     // load ROI and normalization
     for (size_t j = 0; j < h; j++) {
         for (size_t i = 0; i < w; i++) {
-            f[j * w + i] = (double((uint8_t)frame[(j + y) * w + (i + x)])) / 255;
+            f[j * w + i] = (double((uint8_t)frame[(j + y) * picW + (i + x)])) / 255;
         }
+    }
+
+    for (size_t i = 0; i < affineNum; i++) {
+        double m[2][3] = {};
+        genMatrix(w, h, m[0]);
+        memset(fa, 0, sizeof(double) * w * h);
+        affine(f, w, h, fa, w, h, m);
+        preproc(fa, cos, fi, w, h);
     }
 
     initStatus = true;
@@ -126,3 +138,4 @@ void Mosse::dump()
     dump2text("G", G, 2 * w, h, dumpIndex);
     dumpIndex++;
 }
+

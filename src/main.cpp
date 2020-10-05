@@ -25,7 +25,7 @@ int main()
     char* frame = new char[picW * picH];
     loadFrame("tmp1.yuv", frame, picW, picH);
 
-    tracker.init(frame, rect);
+    tracker.init(frame, picW, picH, rect);
 
     tracker.dump();
 
