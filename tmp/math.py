@@ -210,18 +210,36 @@ def gaussian2d_labels(w, h, sigma):
     labels = np.exp(-0.5*dist)
     return labels
 
+def affine_matrix(a):
+    h, w = a.shape[:2]
+    T = np.zeros((2, 3))
+    coef = 0.2
+    ang = (np.random.rand()-0.5)*coef
+    c, s = np.cos(ang), np.sin(ang)
+    T[:2, :2] = [[c,-s], [s, c]]
+    T[:2, :2] += (np.random.rand(2, 2) - 0.5)*coef
+    c = (w/2, h/2)
+    T[:,2] = c - np.dot(T[:2, :2], c)
+    return T
+
+def genRef():
+    w, h = 30, 62
+    cos = cos_window((w, h))
+    dump2txt('cos', cos)
+
+    g = gaussian2d_labels(w, h, 2.0)
+    dump2txt('g', g)
+
+    G = np.fft.fft2(g)
+    dump2txt('G', G)
+
 w, h = 30, 62
-cos = cos_window((w, h))
-dump2txt('cos', cos)
-
-g = gaussian2d_labels(w, h, 2.0)
-dump2txt('g', g)
-
-G = np.fft.fft2(g)
-dump2txt('G', G)
-
-
 #test_mosse()
 #test_affine()
+
+#genRef()
+
+a = np.arange(w*h).reshape((h, w))
+print(affine_matrix(a))
 
 print('\ndone')
