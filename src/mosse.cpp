@@ -68,6 +68,7 @@ Mosse::~Mosse()
     freeArray(fi);
     freeArray(Fi);
     freeArray(G);
+    freeArray(Gi);
     freeArray(H);
     freeArray(H1);
     freeArray(H2);
@@ -77,6 +78,8 @@ int Mosse::init(char* frame, int pw, int ph, const Rect r)
 {
     picW = pw;
     picH = ph;
+    x = r.x;
+    y = r.y;
     w = r.w;
     h = r.h;
 
@@ -96,8 +99,9 @@ int Mosse::init(char* frame, int pw, int ph, const Rect r)
     H1 = allocArray<double>(sz2);
     H2 = allocArray<double>(sz2);
     Fi = allocArray<double>(sz2);
+    Gi = allocArray<double>(sz2);
 
-    if (!cos || !g || !G || !H1 || !H2 || !H)
+    if (!cos || !g || !f || !fa || !fi || !G || !H || !H1 || !H2 || !Fi || !Gi)
         return -1;
 
     cosWindow(cos, w, h);
@@ -158,8 +162,50 @@ int Mosse::init(char* frame, int pw, int ph, const Rect r)
     return 0;
 }
 
-int Mosse::update(char* frame, Rect& out)
+int Mosse::update(char* frame, int pw, int ph)
 {
+    if (pw != picW || ph != picH)
+        return -1;
+
+    // Fi
+    for (size_t j = 0; j < h; j++) {
+        for (size_t i = 0; i < w; i++) {
+            f[j * w + i] = (double((uint8_t)frame[(j + y) * picW + (i + x)])) / 255;
+        }
+    }
+    preproc(f, cos, fi, w, h);
+    dft2d(w, h, fi, Fi);
+
+    // Gi = H * Fi
+    for (size_t j = 0; j < h; j++) {
+        for (size_t x = 0; x < w; x++) {
+            double a =  H[j * 2 * w + 2 * x + 0];
+            double b =  H[j * 2 * w + 2 * x + 1];
+            double c = Fi[j * 2 * w + 2 * x + 0];
+            double d = Fi[j * 2 * w + 2 * x + 1];
+            Gi[j * 2 * w + 2 * x + 0] = a * c - b * d;
+            Gi[j * 2 * w + 2 * x + 1] = a * d + b * c;
+        }
+    }
+
+    // gi = IDFT(Gi)
+    double* gi = allocArray<double>(w * h);
+    idft2d(w, h, Gi, gi);
+
+    double mx = 0, my = 0, max = gi[0];
+    for (size_t j = 0; j < h; j++) {
+        for (size_t x = 0; x < w; x++) {
+            if (gi[j * w + x + 0] > max) {
+                max = gi[j * w + x + 0];
+                mx = x;
+                my = j;
+            }
+        }
+    }
+
+    printf("INFO: mx = %d, my = %d\n", mx, my);
+
+    freeArray(gi);
     return 0;
 }
 
