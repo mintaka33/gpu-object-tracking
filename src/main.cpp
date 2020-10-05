@@ -31,9 +31,10 @@ int main()
     char* frame2 = new char[picW * picH];
     loadFrame("tmp2.yuv", frame2, picW, picH);
 
-    tracker.update(frame2, picW, picH);
+    //tracker.update(frame2, picW, picH);
 
-    tracker.dump();
+    tracker.dump2txt();
+    tracker.dump2bin();
 
     PFU_STOP("Total");
 

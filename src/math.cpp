@@ -119,6 +119,8 @@ void getMatrix(int w, int h, double* mat)
 
     mat[0] = m[0][0], mat[1] = m[0][1], mat[2] = m[0][2];
     mat[3] = m[1][0], mat[4] = m[1][1], mat[5] = m[1][2];
+
+    //printf("%f, %f, %f, %f, %f, %f\n", mat[0], mat[1], mat[2], mat[3], mat[4], mat[5]);
 }
 
 double bilinear(double q11, double q12, double q21, double q22, double x1, double y1, double x2, double y2, double x, double y)

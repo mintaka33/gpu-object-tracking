@@ -19,7 +19,9 @@ public:
 
     int init(char* frame, int pw, int ph, const Rect r);
     int update(char* frame, int pw, int ph);
-    void dump();
+
+    void dump2txt();
+    void dump2bin();
 
 private:
     int x = 0;
@@ -44,6 +46,6 @@ private:
     double* Gi = nullptr;
 
     bool initStatus = false;
-    const int affineNum = 8;
+    const int affineNum = 1;
 };
 
