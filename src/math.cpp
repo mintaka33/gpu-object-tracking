@@ -70,6 +70,32 @@ void dft2d(const int M, const int N, double* f, double* F)
     PFU_LEAVE;
 }
 
+void idft2d(const int M, const int N, double* F, double* f)
+{
+    PFU_ENTER;
+
+    for (size_t v = 0; v < N; v++) {
+        for (size_t u = 0; u < M; u++) {
+            std::complex<double> sum = 0;
+            for (size_t y = 0; y < N; y++) {
+                for (size_t x = 0; x < M; x++) {
+                    double tmp = (u * x / (double)M + v * y / (double)N);
+                    std::complex<double> t = exp(std::complex<double>(0, (2 * PI) * tmp));
+                    double a = F[y * M * 2 + x + 0];
+                    double b = F[y * M * 2 + x + 1];
+                    double c = t.real();
+                    double d = t.imag();
+
+                    sum += std::complex<double>((a * c - b * d), (a * d + b * c));
+                }
+            }
+            f[v * M + u] = sum.real();
+        }
+    }
+
+    PFU_LEAVE;
+}
+
 void getMatrix(int w, int h, double* mat)
 {
     double r[5] = {};
