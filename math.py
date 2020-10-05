@@ -27,6 +27,20 @@ def dump2txt(filename, a):
         for line in outstr:
             f.write(line)
 
+def dump2bin(tag, a, i=0):
+    h, w = a.shape
+    outstr = []
+    filename = 'dump.%s.%d.%dx%d.yuv'%(tag, i, w, h)
+    out = np.zeros((h, w)).astype(np.uint8)
+    for y in range(h):
+        for x in range(w):
+            d = a[y][x] * 255
+            t = 255 if d >255 else (0 if d<0 else d)
+            out[y][x] = t
+    with open(filename, 'wb') as f:
+        out.tofile(f)
+
+
 def cos2d():
     sz = [20, 10]
     a = np.hanning(int(sz[1]))
@@ -158,14 +172,17 @@ def test_mosse():
     with open('tmp1.yuv', 'rb') as f:
         yuv = np.fromfile(f, dtype='uint8')
         y1 = yuv[0:w*h].reshape((h, w))
-    y1d = cv2.rectangle(y1, (r[0], r[1]), (r[0]+r[2], r[1]+r[3]), (255, 0, 0))
-    cv2.imwrite('tmp1.py.out.rect.bmp', y1d)
+    #y1d = cv2.rectangle(y1, (r[0], r[1]), (r[0]+r[2], r[1]+r[3]), (255, 0, 0))
+    #cv2.imwrite('tmp1.py.out.rect.bmp', y1d)
 
     mosse.track_init(r, y1)
 
     dump2txt('dump.py.cos', mosse.cos)
     dump2txt('dump.py.gauss', mosse.gauss)
     dump2txt('dump.py.G', mosse.G)
+    dump2txt('dump.py.f_rect', mosse.f_rect)
+
+    dump2bin('f_rect', mosse.f_rect)
 
     #dump2txt('dump.py.Ai.real', mosse.Ai.real)
     #dump2txt('dump.py.Ai.imag', mosse.Ai.imag)
@@ -233,13 +250,10 @@ def genRef():
     G = np.fft.fft2(g)
     dump2txt('G', G)
 
-w, h = 30, 62
-#test_mosse()
+test_mosse()
+
 #test_affine()
 
 #genRef()
-
-a = np.arange(w*h).reshape((h, w))
-print(affine_matrix(a))
 
 print('\ndone')
