@@ -109,8 +109,8 @@ def preprocessing(img, cos_window, eps=1e-5):
     return cos_window*img
 
 def test_preproc():
-    w, h = 20, 10
-    f = np.arange((w*h)).reshape((h, w)).astype(np.uint8)
+    w, h = 30, 62
+    f = ((np.arange((w*h))%256)/255).reshape((h, w))
     dump2txt('dump.f.txt', f)
     #dst = np.zeros((h, w)).astype(np.float)
     cos = cos_window((w, h))
@@ -250,10 +250,10 @@ def genRef():
     G = np.fft.fft2(g)
     dump2txt('G', G)
 
-test_mosse()
-
+#test_mosse()
 #test_affine()
-
 #genRef()
+
+test_preproc()
 
 print('\ndone')
