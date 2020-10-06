@@ -118,15 +118,15 @@ void idft2d(const int M, const int N, double* F, double* f)
                 for (size_t x = 0; x < M; x++) {
                     double tmp = (u * x / (double)M + v * y / (double)N);
                     std::complex<double> t = exp(std::complex<double>(0, (2 * PI) * tmp));
-                    double a = F[y * M * 2 + x + 0];
-                    double b = F[y * M * 2 + x + 1];
+                    double a = F[y * M * 2 + x * 2 + 0];
+                    double b = F[y * M * 2 + x * 2 + 1];
                     double c = t.real();
                     double d = t.imag();
 
                     sum += std::complex<double>((a * c - b * d), (a * d + b * c));
                 }
             }
-            f[v * M + u] = sum.real();
+            f[v * M + u] = sum.real() / (M * N);
         }
     }
 

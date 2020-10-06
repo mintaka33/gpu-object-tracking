@@ -22,11 +22,12 @@ void test_preproc()
 
     double* f = new double[w * h];
     uint8_t count = 0;
-    for (size_t j = 0; j < h; j++)
+    for (size_t j = 0; j < h; j++) {
         for (size_t i = 0; i < w; i++) {
             f[j * w + i] = count / 255.0;
             count++;
         }
+    }
 
     double* dst = new double[w * h];
     preproc(f, cos, dst, w, h);
@@ -36,9 +37,33 @@ void test_preproc()
     delete[] f, cos, dst;
 }
 
+void test_dft()
+{
+    const int w = 30, h = 62;
+    double* f = new double[w * h];
+    uint8_t count = 0;
+    for (size_t j = 0; j < h; j++) {
+        for (size_t i = 0; i < w; i++) {
+            f[j * w + i] = count / 255.0;
+            count++;
+        }
+    }
+    dump2text("test_dft_f", f, w, h);
+
+    double* F = new double[2 * w * h];
+    dft2d(w, h, f, F);
+    dump2text("test_dft_F", F, w*2, h);
+
+    double* f2 = new double[w * h];
+    idft2d(w, h, F, f2);
+    dump2text("test_dft_f2", f2, w, h);
+}
+
 int main(int argc, int** argv) 
 {
-    test_preproc();
+    //test_preproc();
+
+    test_dft();
 
     printf("\ndone\n");
     return 0;

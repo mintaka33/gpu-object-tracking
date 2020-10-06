@@ -108,16 +108,6 @@ def preprocessing(img, cos_window, eps=1e-5):
     img=(img-np.mean(img))/(np.std(img)+eps)
     return cos_window*img
 
-def test_preproc():
-    w, h = 30, 62
-    f = ((np.arange((w*h))%256)/255).reshape((h, w))
-    dump2txt('dump.f.txt', f)
-    #dst = np.zeros((h, w)).astype(np.float)
-    cos = cos_window((w, h))
-    dump2txt('dump.cos.txt', cos)
-    dst = preprocessing(f, cos)
-    dump2txt('dump.dst.txt', dst)
-
 def test():
     print(' '.join("%5.3f" % abs(f) for f in fft([1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0])))
 
@@ -250,10 +240,30 @@ def genRef():
     G = np.fft.fft2(g)
     dump2txt('G', G)
 
+def test_preproc():
+    w, h = 30, 62
+    f = ((np.arange((w*h))%256)/255).reshape((h, w))
+    dump2txt('dump.f.txt', f)
+
+    cos = cos_window((w, h))
+    dump2txt('dump.cos.txt', cos)
+    dst = preprocessing(f, cos)
+    dump2txt('dump.dst.txt', dst)
+
+def test_fft():
+    w, h = 30, 62
+    f = ((np.arange((w*h))%256)/255).reshape((h, w))
+    dump2txt('dump_fft.f.txt', f)
+    F = np.fft.fft2(f)
+    dump2txt('dump_fft.F.txt', F)
+    f2 = np.real(np.fft.ifft2(F)) 
+    dump2txt('dump_fft.f2.txt', f2)
+
 #test_mosse()
 #test_affine()
 #genRef()
+#test_preproc()
 
-test_preproc()
+test_fft()
 
 print('\ndone')
