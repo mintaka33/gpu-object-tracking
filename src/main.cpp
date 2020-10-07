@@ -19,7 +19,7 @@ int main()
     PFU_START("Total");
 
     size_t picW = 640, picH = 360;
-    Rect rect = { 387, 198, 30, 62 };
+    Rect rect = { 270, 160, 53, 33 };
 
     Mosse tracker;
 

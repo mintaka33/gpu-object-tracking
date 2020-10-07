@@ -177,7 +177,7 @@ int Mosse::update(char* frame, int pw, int ph)
         }
     }
 
-    printf("INFO: mx = %d, my = %d\n", mx, my);
+    printf("INFO: mx = %d, my = %d, dx = %d, dy = %d\n", mx, my, (mx - w/2), (my - h/2));
 
     freeArray(gi);
     return 0;

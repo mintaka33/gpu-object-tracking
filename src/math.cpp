@@ -181,9 +181,9 @@ void affine(double* src, int sw, int sh, double* dst, int dw, int dh, double m[2
             x = m[0][0] * i + m[0][1] * j + m[0][2] * 1;
             y = m[1][0] * i + m[1][1] * j + m[1][2] * 1;
 
-            if ((x < 0) || (y < 0) || (x > (dw - 2)) || (y > (dh - 2))) {
-                continue;
-            }
+            //if ((x < 0) || (y < 0) || (x > (dw - 2)) || (y > (dh - 2))) {
+            //    continue;
+            //}
 
             x = (x < 0) ? 0.0 : x;
             y = (y < 0) ? 0.0 : y;
@@ -195,13 +195,15 @@ void affine(double* src, int sw, int sh, double* dst, int dw, int dh, double m[2
             x2 = x1 + 1; x2i = (int)x2;
             y2 = y1 + 1; y2i = (int)y2;
 
-            q11[0] = src[(y1i * sw + x1i)];
-            q12[0] = src[(y1i * sw + x2i)];
-            q21[0] = src[(y2i * sw + x1i)];
-            q22[0] = src[(y2i * sw + x2i)];
-            yp = bilinear(q11[0], q12[0], q21[0], q22[0], x1, y1, x2, y2, x, y);
+            dst[(y1i * dw + x1i)] = src[j * dw + i];
 
-            dst[(j * dw + i)] = yp;
+            //q11[0] = src[(y1i * sw + x1i)];
+            //q12[0] = src[(y1i * sw + x2i)];
+            //q21[0] = src[(y2i * sw + x1i)];
+            //q22[0] = src[(y2i * sw + x2i)];
+            //yp = bilinear(q11[0], q12[0], q21[0], q22[0], x1, y1, x2, y2, x, y);
+
+            //dst[(j * dw + i)] = yp;
         }
     }
 }

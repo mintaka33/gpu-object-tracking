@@ -46,6 +46,6 @@ private:
     double* Gi = nullptr;
 
     bool initStatus = false;
-    const int affineNum = 1;
+    const int affineNum = 16;
 };
 

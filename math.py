@@ -155,7 +155,7 @@ def test4():
 
 def test_mosse():
     w, h = 640, 360
-    r = [387, 198, 30, 62]
+    r = [270, 160, 53, 33]
     print('frame1 rect:', r)
     y1 = np.zeros((h, w))
     y2 = np.zeros((h, w))
@@ -259,11 +259,11 @@ def test_fft():
     f2 = np.real(np.fft.ifft2(F)) 
     dump2txt('dump_fft.f2.txt', f2)
 
-#test_mosse()
+test_mosse()
 #test_affine()
 #genRef()
 #test_preproc()
 
-test_fft()
+#test_fft()
 
 print('\ndone')
