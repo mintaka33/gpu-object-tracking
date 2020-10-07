@@ -1,8 +1,8 @@
 import numpy as np
 import cv2
 
-Ai, Bi, G, cos, gauss, f_rect = None, None, None, None, None, None
-x, y, w, h, center = None, None, None, None, None
+Ai, Bi, G, cos, gauss, f_rect, fip, Fi, H, Gi, Hi = None, None, None, None, None, None, None, None, None, None, None
+x, y, w, h, center, gi = None, None, None, None, None, None
 sigma = 2.0
 interp_factor = 0.125
 
@@ -22,7 +22,8 @@ def gaussian2d_labels(w, h, sigma):
 def preprocessing(img, cos_window, eps=1e-5):
     img=np.log(img+1)
     img=(img-np.mean(img))/(np.std(img)+eps)
-    return cos_window*img
+    tmp = cos_window*img
+    return tmp
 
 def rand_warp(img):
     h, w = img.shape[:2]
@@ -51,7 +52,7 @@ def rand_warp2(a):
     return cv2.warpAffine(a, T, (w, h), borderMode = cv2.BORDER_REFLECT)
 
 def track_init(pos, frame):
-    global Ai, Bi, G, cos, gauss, x, y, w, h, center, f_rect
+    global Ai, Bi, G, cos, gauss, x, y, w, h, center, f_rect, fip, Fi, H
     x, y, w, h = pos[0], pos[1], pos[2], pos[3]
     center = (x+w/2, y+h/2)
     cos = cos_window((w, h))
@@ -68,17 +69,21 @@ def track_init(pos, frame):
 
     for _ in range(8):
         fi = rand_warp2(f_rect)
-        Fi = np.fft.fft2(preprocessing(fi, cos))
+        fip = preprocessing(fi, cos)
+        Fi = np.fft.fft2(fip)
         Ai += G * np.conj(Fi)
         Bi += Fi * np.conj(Fi)
+    H = Ai/Bi
 
 def track_update(frame):
-    global Ai, Bi, G, cos, x, y, w, h, center, f_rect
+    global Ai, Bi, G, cos, x, y, w, h, center, f_rect, fi, fip, Fi, Gi, Hi, gi
     img2 = frame.astype(np.float32)/255
     Hi = Ai/Bi
-    fi = cv2.getRectSubPix(img2, (w, h), center)
-    fi = preprocessing(fi, cos)
-    Gi = Hi * np.fft.fft2(fi)
+    #fi = cv2.getRectSubPix(img2, (w, h), center)
+    fi = img2[y:y+h, x:x+w]
+    fip = preprocessing(fi, cos)
+    Fi = np.fft.fft2(fip)
+    Gi = Hi * Fi
     gi = np.real(np.fft.ifft2(Gi))
     curr = np.unravel_index(np.argmax(gi, axis=None), gi.shape)
     dy, dx = int(round(curr[0]-(h/2))), int(round(curr[1]-(w/2)))

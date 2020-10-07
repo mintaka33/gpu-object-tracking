@@ -171,8 +171,16 @@ def test_mosse():
     dump2txt('dump.py.gauss', mosse.gauss)
     dump2txt('dump.py.G', mosse.G)
     dump2txt('dump.py.f_rect', mosse.f_rect)
+    dump2txt('dump.py.fip', mosse.fip)
 
     dump2bin('f_rect', mosse.f_rect)
+
+    dump2txt('dump.py.Fi', mosse.Fi)
+    dump2txt('dump.py.Ai', mosse.Ai)
+    dump2txt('dump.py.Bi', mosse.Bi)
+    dump2txt('dump.py.H', mosse.H)
+
+    #dump2txt('dump.py.Fi.imag', mosse.Fi.imag)
 
     #dump2txt('dump.py.Ai.real', mosse.Ai.real)
     #dump2txt('dump.py.Ai.imag', mosse.Ai.imag)
@@ -194,6 +202,14 @@ def test_mosse():
         y2 = yuv[0:w*h].reshape((h, w))
 
     bb = mosse.track_update(y2)
+
+    dump2txt('dump.py.fi2', mosse.fi)
+    dump2txt('dump.py.fip2', mosse.fip)
+    dump2txt('dump.py.Fi2', mosse.Fi)
+    dump2txt('dump.py.Gi2', mosse.Gi)
+    dump2txt('dump.py.Hi2', mosse.Hi)
+    dump2txt('dump.py.gi2', mosse.gi)
+
     print('frame2 rect:', bb)
     y2d = cv2.rectangle(y2, (bb[0], bb[1]), (bb[0]+bb[2], bb[1]+bb[3]), (255, 0, 0))
     cv2.imwrite('tmp2.py.out.rect.bmp', y2d)
