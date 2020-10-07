@@ -9,7 +9,7 @@
 void dump2text(char* tag, double* data, const int w, const int h, int i)
 {
     char filename[256] = {};
-    sprintf_s(filename, "dump.%s.%04d.%dx%d.txt", tag, i, w, h);
+    sprintf_s(filename, "dump.%04d.%s.%dx%d.txt", i, tag, w, h);
     std::ofstream of(filename);
     char tmp[64] = {};
     for (size_t y = 0; y < h; y++) {
@@ -75,10 +75,12 @@ void guassian2d(double* guass, const int w, const int h)
     PFU_ENTER;
 
     const double sigma = 2.0;
+    double hw = double(w) / 2.0;
+    double hh = double(h) / 2.0;
     double c = 1 / (2 * PI * sigma * sigma);
     for (size_t y = 0; y < h; y++) {
         for (size_t x = 0; x < w; x++) {
-            double ep = ((x - w / 2) * (x - w / 2) + (y - h / 2) * (y - h / 2)) / (sigma * sigma);
+            double ep = ((x - hw) * (x - hw) + (y - hh) * (y - hh)) / (sigma * sigma);
             guass[x + y * w] = exp(-0.5 * ep);
         }
     }
@@ -207,6 +209,25 @@ void affine(double* src, int sw, int sh, double* dst, int dw, int dh, double m[2
         }
     }
 }
+
+//void affine2(double* src, int sw, int sh, double* dst, int dw, int dh, double m[2][3])
+//{
+//    Mat src_mat(sh, sw, CV_64FC1, src);
+//    Mat dst_mat = Mat::zeros(sh, sw, src_mat.type());
+//    Mat affine_mat = Mat(2, 3, CV_64FC1);
+//    affine_mat.at<double>(0, 0) = m[0][0];
+//    affine_mat.at<double>(0, 1) = m[0][1];
+//    affine_mat.at<double>(0, 2) = m[0][2];
+//    affine_mat.at<double>(1, 0) = m[1][0];
+//    affine_mat.at<double>(1, 1) = m[1][1];
+//    affine_mat.at<double>(1, 2) = m[1][2];
+//    warpAffine(src_mat, dst_mat, affine_mat, src_mat.size(), INTER_LINEAR, BORDER_REFLECT);
+//    for (size_t y = 0; y < sh; y++) {
+//        for (size_t x = 0; x < sw; x++) {
+//            dst[y * sw + x] = dst_mat.at<double>(y, x);
+//        }
+//    }
+//}
 
 void preproc(double* f, double* cos, double* dst, int w, int h)
 {

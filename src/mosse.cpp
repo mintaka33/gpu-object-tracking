@@ -35,20 +35,20 @@ Mosse::Mosse()
 
 Mosse::~Mosse()
 {
-    freeArray(curImg);
-    freeArray(cos);
-    freeArray(f);
-    freeArray(fa);
-    freeArray(fi);
-    freeArray(Fi);
-    freeArray(G);
-    freeArray(Gi);
-    freeArray(H);
-    freeArray(H1);
-    freeArray(H2);
+    //freeArray(curImg);
+    //freeArray(cos);
+    //freeArray(f);
+    //freeArray(fa);
+    //freeArray(fi);
+    //freeArray(Fi);
+    //freeArray(G);
+    //freeArray(Gi);
+    //freeArray(H);
+    //freeArray(H1);
+    //freeArray(H2);
 }
 
-int Mosse::init(char* frame, int pw, int ph, const Rect r)
+int Mosse::init(char* frame, int pw, int ph, const RoiRect r)
 {
     picW = pw;
     picH = ph;
@@ -66,6 +66,21 @@ int Mosse::init(char* frame, int pw, int ph, const Rect r)
     f = allocArray<double>(sz);
     fa = allocArray<double>(sz);
     fi = allocArray<double>(sz);
+    gi = allocArray<double>(sz);
+
+    //cosMat = new Mat(h, w, CV_64FC1);
+    //gMat = new Mat(h, w, CV_64FC1);
+    //fMat = new Mat(h, w, CV_64FC1);
+    //faMat = new Mat(h, w, CV_64FC1);
+    //fiMat = new Mat(h, w, CV_64FC1);
+    //giMat = new Mat(h, w, CV_64FC1);
+    //cos = (double*)cosMat->data;// allocArray<double>(sz);
+    //g = (double*)gMat->data;
+    //f = (double*)fMat->data;
+    //fa = (double*)faMat->data;
+    //fi = (double*)fiMat->data;
+    //gi = (double*)giMat->data;
+    //memset(gi, 0, sizeof(double) * w * h);
 
     int sz2 = sz * 2; // size of complex number array
     G = allocArray<double>(sz2);
@@ -74,6 +89,22 @@ int Mosse::init(char* frame, int pw, int ph, const Rect r)
     H2 = allocArray<double>(sz2);
     Fi = allocArray<double>(sz2);
     Gi = allocArray<double>(sz2);
+
+    //GMat = new Mat(h, 2 * w, CV_64FC1);
+    //HMat = new Mat(h, 2 * w, CV_64FC1);
+    //H1Mat = new Mat(h, 2 * w, CV_64FC1);
+    //H2Mat = new Mat(h, 2 * w, CV_64FC1);
+    //FiMat = new Mat(h, 2 * w, CV_64FC1);
+    //GiMat = new Mat(h, 2 * w, CV_64FC1);
+    //G = (double*)GMat->data;
+    //H = (double*)HMat->data;
+    //H1 = (double*)H1Mat->data;
+    //H2 = (double*)H2Mat->data;
+    //Fi = (double*)FiMat->data;
+    //Gi = (double*)GiMat->data;
+    //memset(H1, 0, sizeof(double) * w * 2 * h);
+    //memset(H2, 0, sizeof(double) * w * 2 * h);
+    //memset(Gi, 0, sizeof(double) * w * 2 * h);
 
     if (!cos || !g || !f || !fa || !fi || !G || !H || !H1 || !H2 || !Fi || !Gi)
         return -1;
@@ -95,6 +126,7 @@ int Mosse::init(char* frame, int pw, int ph, const Rect r)
 
         memset(fa, 0, sizeof(double) * w * h);
         affine(f, w, h, fa, w, h, m);
+        //affine2(f, w, h, fa, w, h, m);
 
         preproc(fa, cos, fi, w, h);
 
@@ -152,21 +184,21 @@ int Mosse::update(char* frame, int pw, int ph)
 
     // Gi = H * Fi
     for (size_t j = 0; j < h; j++) {
-        for (size_t x = 0; x < w; x++) {
-            double a =  H[j * 2 * w + 2 * x + 0];
-            double b =  H[j * 2 * w + 2 * x + 1];
-            double c = Fi[j * 2 * w + 2 * x + 0];
-            double d = Fi[j * 2 * w + 2 * x + 1];
-            Gi[j * 2 * w + 2 * x + 0] = a * c - b * d;
-            Gi[j * 2 * w + 2 * x + 1] = a * d + b * c;
+        for (size_t i = 0; i < w; i++) {
+            double a =  H[j * 2 * w + 2 * i + 0];
+            double b =  H[j * 2 * w + 2 * i + 1];
+            double c = Fi[j * 2 * w + 2 * i + 0];
+            double d = Fi[j * 2 * w + 2 * i + 1];
+            Gi[j * 2 * w + 2 * i + 0] = a * c - b * d;
+            Gi[j * 2 * w + 2 * i + 1] = a * d + b * c;
         }
     }
 
     // gi = IDFT(Gi)
-    double* gi = allocArray<double>(w * h);
     idft2d(w, h, Gi, gi);
 
-    int mx = 0, my = 0, max = gi[0];
+    int mx = 0, my = 0;
+    double max = gi[0];
     for (size_t j = 0; j < h; j++) {
         for (size_t i = 0; i < w; i++) {
             if (gi[j * w + i] > max) {
@@ -179,7 +211,6 @@ int Mosse::update(char* frame, int pw, int ph)
 
     printf("INFO: mx = %d, my = %d, dx = %d, dy = %d\n", mx, my, (mx - w/2), (my - h/2));
 
-    freeArray(gi);
     return 0;
 }
 
@@ -203,12 +234,14 @@ void Mosse::dump2txt()
     dump2text("f", f, w, h, dumpIndex);
     dump2text("fa", fa, w, h, dumpIndex);
     dump2text("fi", fi, w, h, dumpIndex);
+    dump2text("gi", gi, w, h, dumpIndex);
 
     dump2text("G",  G,  2 * w, h, dumpIndex);
     dump2text("Fi", Fi, 2 * w, h, dumpIndex);
     dump2text("H1", H1, 2 * w, h, dumpIndex);
     dump2text("H2", H2, 2 * w, h, dumpIndex);
     dump2text("H",  H,  2 * w, h, dumpIndex);
+    dump2text("Gi", Gi, 2 * w, h, dumpIndex);
 
     dumpIndex++;
 }

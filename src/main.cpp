@@ -19,7 +19,7 @@ int main()
     PFU_START("Total");
 
     size_t picW = 640, picH = 360;
-    Rect rect = { 270, 160, 53, 33 };
+    RoiRect rect = { 270, 160, 53, 33 };
 
     Mosse tracker;
 
@@ -28,13 +28,15 @@ int main()
 
     tracker.init(frame, picW, picH, rect);
 
+    tracker.dump2txt();
+
     char* frame2 = new char[picW * picH];
     loadFrame("tmp2.yuv", frame2, picW, picH);
 
     tracker.update(frame2, picW, picH);
 
     tracker.dump2txt();
-    tracker.dump2bin();
+    //tracker.dump2bin();
 
     PFU_STOP("Total");
 
