@@ -24,21 +24,24 @@ int main()
     Mosse tracker;
 
     char* frame = new char[picW * picH];
-    loadFrame("tmp1.yuv", frame, picW, picH);
+    loadFrame("input2\\tmp.001.yuv", frame, picW, picH);
 
     tracker.init(frame, picW, picH, ri);
-
     //tracker.dump2txt();
 
     char* frame2 = new char[picW * picH];
-    loadFrame("tmp2.yuv", frame2, picW, picH);
+    for (size_t i = 2; i <= 250; i++) {
+        char filename[256] = {};
+        sprintf_s(filename, "input2\\tmp.%03d.yuv", i);
+        loadFrame(filename, frame2, picW, picH);
 
-    RoiRect ro = {};
-    tracker.update(frame2, picW, picH, ro);
-    printf("OutROI: %d, %d, %d, %d\n", ro.x, ro.y, ro.w, ro.h);
+        RoiRect ro = {};
+        tracker.update(frame2, picW, picH, ro);
+        //printf("OutROI: %d, %d, %d, %d\n", ro.x, ro.y, ro.w, ro.h);
 
-    //tracker.dump2txt();
-    //tracker.dump2bin();
+        //tracker.dump2txt();
+        //tracker.dump2bin();
+    }
 
     PFU_STOP("Total");
 
