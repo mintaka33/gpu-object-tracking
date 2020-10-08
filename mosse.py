@@ -73,7 +73,7 @@ def track_init(pos, frame):
         Fi = np.fft.fft2(fip)
         Ai += G * np.conj(Fi)
         Bi += Fi * np.conj(Fi)
-    H = Ai/Bi
+    #H = Ai/Bi
 
 def track_update(frame):
     global Ai, Bi, G, cos, x, y, w, h, center, f_rect, fi, fip, Fi, Gi, Hi, gi
@@ -93,14 +93,16 @@ def track_update(frame):
     yc += dy
     x, y = (x+dx, y+dy)
     center = (xc, yc)
-    f_rect = cv2.getRectSubPix(img2, (w, h), center)
+    print('INFO: mx = %d, my = %d, dx = %d, dy = %d'%(curr[1], curr[0], dx, dy))
+    #f_rect = cv2.getRectSubPix(img2, (w, h), center)
+    f_rect = img2[y:y+h, x:x+w]
     Fi = np.fft.fft2(preprocessing(f_rect, cos))
     Ai = interp_factor * (G * np.conj(Fi)) + (1 - interp_factor) * Ai
     Bi = interp_factor * (Fi * np.conj(Fi)) + (1 - interp_factor) * Bi
     return bb
 
 def main():
-    cap = cv2.VideoCapture('test.265')
+    cap = cv2.VideoCapture('test2.265')
     if not cap.isOpened():
         print("ERROR: cannot open video file!")
         exit()
@@ -113,7 +115,8 @@ def main():
         frame_gray = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
 
         if init_bb is None:
-            init_bb = cv2.selectROI("Frame", frame, fromCenter=False, showCrosshair=True)
+            init_bb = [270, 160, 53, 33] 
+            #init_bb = cv2.selectROI("Frame", frame, fromCenter=False, showCrosshair=True)
             track_init(init_bb, frame_gray)
             x, y, w, h = init_bb[0], init_bb[1], init_bb[2], init_bb[3]
             cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
@@ -122,10 +125,10 @@ def main():
             out_bb = track_update(frame_gray)
             x, y, w, h = out_bb[0], out_bb[1], out_bb[2], out_bb[3]
             cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            print(out_bb)
+            #print(out_bb)
 
         cv2.imshow("Frame", frame)
-        key = cv2.waitKey(0) & 0xFF
+        key = cv2.waitKey(1) & 0xFF
         if key == ord("q"):
             break
 
