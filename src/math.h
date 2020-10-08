@@ -1,5 +1,14 @@
 #pragma once
 
+#define USE_OPENCV 1
+
+#if USE_OPENCV
+#include "opencv2/imgcodecs.hpp"
+#include "opencv2/highgui.hpp"
+#include "opencv2/imgproc.hpp"
+using namespace cv;
+#endif
+
 #define PI 3.14159265
 
 void hanning(const int m, double* d);
@@ -9,7 +18,9 @@ void dft2d(const int M, const int N, double* f, double* F);
 void idft2d(const int M, const int N, double* F, double* f);
 void getMatrix(int w, int h, double* mat);
 void affine(double* src, int sw, int sh, double* dst, int dw, int dh, double m[2][3]);
-//void affine2(double* src, int sw, int sh, double* dst, int dw, int dh, double m[2][3]);
+#if USE_OPENCV
+void cvAffine(double* src, int sw, int sh, double* dst, int dw, int dh, double m[2][3]);
+#endif
 void preproc(double* f, double* cos, double* dst, int w, int h);
 
 void dump2text(char* tag, double* data, const int w, const int h, int i = 0);

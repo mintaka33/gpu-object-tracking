@@ -1,5 +1,8 @@
 #include <complex>
 #include <iomanip>
+#include <random>
+#include <chrono>
+
 #include <complex.h>
 #include <time.h>
 
@@ -138,10 +141,17 @@ void idft2d(const int M, const int N, double* F, double* f)
 void getMatrix(int w, int h, double* mat)
 {
     double r[5] = {};
-    srand(time(NULL));
+    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+    std::default_random_engine generator(seed);
+    std::uniform_real_distribution<double> distribution(-0.1, 0.1);
     for (size_t i = 0; i < 5; i++) {
-        r[i] = (((double)rand() / (RAND_MAX)) - 0.5) * 0.2; // (-0.1, 0.1)
+        r[i] = distribution(generator); // (-0.1, 0.1)
     }
+
+    //srand(time(NULL));
+    //for (size_t i = 0; i < 5; i++) {
+    //    r[i] = (((double)rand() / (RAND_MAX)) - 0.5) * 0.2; // (-0.1, 0.1)
+    //}
 
     double c = cos(r[0]);
     double s = sin(r[0]);
@@ -159,7 +169,7 @@ void getMatrix(int w, int h, double* mat)
     mat[0] = m[0][0], mat[1] = m[0][1], mat[2] = m[0][2];
     mat[3] = m[1][0], mat[4] = m[1][1], mat[5] = m[1][2];
 
-    //printf("%f, %f, %f, %f, %f, %f\n", mat[0], mat[1], mat[2], mat[3], mat[4], mat[5]);
+    //printf("%10.6f, %10.6f, %10.6f, %10.6f, %10.6f, %10.6f\n", mat[0], mat[1], mat[2], mat[3], mat[4], mat[5]);
 }
 
 double bilinear(double q11, double q12, double q21, double q22, double x1, double y1, double x2, double y2, double x, double y)
@@ -210,24 +220,26 @@ void affine(double* src, int sw, int sh, double* dst, int dw, int dh, double m[2
     }
 }
 
-//void affine2(double* src, int sw, int sh, double* dst, int dw, int dh, double m[2][3])
-//{
-//    Mat src_mat(sh, sw, CV_64FC1, src);
-//    Mat dst_mat = Mat::zeros(sh, sw, src_mat.type());
-//    Mat affine_mat = Mat(2, 3, CV_64FC1);
-//    affine_mat.at<double>(0, 0) = m[0][0];
-//    affine_mat.at<double>(0, 1) = m[0][1];
-//    affine_mat.at<double>(0, 2) = m[0][2];
-//    affine_mat.at<double>(1, 0) = m[1][0];
-//    affine_mat.at<double>(1, 1) = m[1][1];
-//    affine_mat.at<double>(1, 2) = m[1][2];
-//    warpAffine(src_mat, dst_mat, affine_mat, src_mat.size(), INTER_LINEAR, BORDER_REFLECT);
-//    for (size_t y = 0; y < sh; y++) {
-//        for (size_t x = 0; x < sw; x++) {
-//            dst[y * sw + x] = dst_mat.at<double>(y, x);
-//        }
-//    }
-//}
+#if USE_OPENCV
+void cvAffine(double* src, int sw, int sh, double* dst, int dw, int dh, double m[2][3])
+{
+    Mat src_mat(sh, sw, CV_64FC1, src);
+    Mat dst_mat = Mat::zeros(sh, sw, src_mat.type());
+    Mat affine_mat = Mat(2, 3, CV_64FC1);
+    affine_mat.at<double>(0, 0) = m[0][0];
+    affine_mat.at<double>(0, 1) = m[0][1];
+    affine_mat.at<double>(0, 2) = m[0][2];
+    affine_mat.at<double>(1, 0) = m[1][0];
+    affine_mat.at<double>(1, 1) = m[1][1];
+    affine_mat.at<double>(1, 2) = m[1][2];
+    warpAffine(src_mat, dst_mat, affine_mat, src_mat.size(), INTER_LINEAR, BORDER_REFLECT);
+    for (size_t y = 0; y < sh; y++) {
+        for (size_t x = 0; x < sw; x++) {
+            dst[y * sw + x] = dst_mat.at<double>(y, x);
+        }
+    }
+}
+#endif
 
 void preproc(double* f, double* cos, double* dst, int w, int h)
 {

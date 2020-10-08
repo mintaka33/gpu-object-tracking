@@ -1,10 +1,5 @@
 #pragma once
-//#include "opencv2/imgcodecs.hpp"
-//#include "opencv2/highgui.hpp"
-//#include "opencv2/imgproc.hpp"
-//
-//using namespace cv;
-//using namespace std;
+#include "math.h"
 
 #include <stdio.h>
 #include <math.h>
@@ -37,7 +32,6 @@ private:
     int picW = 0;
     int picH = 0;
     int dumpIndex = 0;
-
     char* curImg = nullptr;
     double* cos = nullptr;
     double* g = nullptr;
@@ -51,20 +45,20 @@ private:
     double* H2 = nullptr;
     double* H = nullptr;
     double* Gi = nullptr;
-
-    //Mat* cosMat = nullptr;
-    //Mat* gMat = nullptr;
-    //Mat* fMat = nullptr;
-    //Mat* faMat = nullptr;
-    //Mat* fiMat = nullptr;
-    //Mat* giMat = nullptr;
-    //Mat* GMat = nullptr;
-    //Mat* FiMat = nullptr;
-    //Mat* H1Mat = nullptr;
-    //Mat* H2Mat = nullptr;
-    //Mat* HMat = nullptr;
-    //Mat* GiMat = nullptr;
-
+#if USE_OPENCV
+    Mat* cosMat = nullptr;
+    Mat* gMat = nullptr;
+    Mat* fMat = nullptr;
+    Mat* faMat = nullptr;
+    Mat* fiMat = nullptr;
+    Mat* giMat = nullptr;
+    Mat* GMat = nullptr;
+    Mat* FiMat = nullptr;
+    Mat* H1Mat = nullptr;
+    Mat* H2Mat = nullptr;
+    Mat* HMat = nullptr;
+    Mat* GiMat = nullptr;
+#endif
     bool initStatus = false;
     const int affineNum = 8;
 };
