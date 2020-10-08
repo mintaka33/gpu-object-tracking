@@ -19,23 +19,25 @@ int main()
     PFU_START("Total");
 
     size_t picW = 640, picH = 360;
-    RoiRect rect = { 270, 160, 53, 33 };
+    RoiRect ri = { 270, 160, 53, 33 };
 
     Mosse tracker;
 
     char* frame = new char[picW * picH];
     loadFrame("tmp1.yuv", frame, picW, picH);
 
-    tracker.init(frame, picW, picH, rect);
+    tracker.init(frame, picW, picH, ri);
 
-    tracker.dump2txt();
+    //tracker.dump2txt();
 
     char* frame2 = new char[picW * picH];
     loadFrame("tmp2.yuv", frame2, picW, picH);
 
-    tracker.update(frame2, picW, picH);
+    RoiRect ro = {};
+    tracker.update(frame2, picW, picH, ro);
+    printf("OutROI: %d, %d, %d, %d\n", ro.x, ro.y, ro.w, ro.h);
 
-    tracker.dump2txt();
+    //tracker.dump2txt();
     //tracker.dump2bin();
 
     PFU_STOP("Total");

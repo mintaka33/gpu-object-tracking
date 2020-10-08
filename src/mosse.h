@@ -19,7 +19,7 @@ public:
     ~Mosse();
 
     int init(char* frame, int pw, int ph, const RoiRect r);
-    int update(char* frame, int pw, int ph);
+    int update(char* frame, int pw, int ph, RoiRect& out);
 
     void dump2txt();
     void dump2bin();
@@ -61,5 +61,6 @@ private:
 #endif
     bool initStatus = false;
     const int affineNum = 8;
+    const double rate = 0.125;
 };
 

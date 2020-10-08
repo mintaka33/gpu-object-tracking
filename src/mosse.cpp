@@ -28,6 +28,15 @@ inline void freeArray(void *p)
     }
 }
 
+void cropNorm(char* src, int picW, int picH, RoiRect r, double* dst)
+{
+    for (size_t j = 0; j < r.h; j++) {
+        for (size_t i = 0; i < r.w; i++) {
+            dst[j * r.w + i] = (double((uint8_t)src[(j + r.y) * picW + (i + r.x)])) / 255.0;
+        }
+    }
+}
+
 Mosse::Mosse()
 {
 
@@ -120,11 +129,7 @@ int Mosse::init(char* frame, int pw, int ph, const RoiRect r)
     dft2d(w, h, g, G);
 
     // load ROI and normalization
-    for (size_t j = 0; j < h; j++) {
-        for (size_t i = 0; i < w; i++) {
-            f[j * w + i] = (double((uint8_t)frame[(j + y) * picW + (i + x)])) / 255.0;
-        }
-    }
+    cropNorm(frame, picW, picH, r, f);
 
     for (size_t i = 0; i < affineNum; i++) {
         double m[2][3] = {}; // { 1.027946, 0.003986, -0.542760, -0.142644, 1.008884, 1.864269 };
@@ -160,6 +165,16 @@ int Mosse::init(char* frame, int pw, int ph, const RoiRect r)
         }
     }
 
+    initStatus = true;
+
+    return 0;
+}
+
+int Mosse::update(char* frame, int pw, int ph, RoiRect& out)
+{
+    if (pw != picW || ph != picH)
+        return -1;
+
     // calculate H = H1 / H2
     for (size_t j = 0; j < h; j++) {
         for (size_t i = 0; i < w; i++) {
@@ -172,22 +187,9 @@ int Mosse::init(char* frame, int pw, int ph, const RoiRect r)
         }
     }
 
-    initStatus = true;
-
-    return 0;
-}
-
-int Mosse::update(char* frame, int pw, int ph)
-{
-    if (pw != picW || ph != picH)
-        return -1;
-
     // Fi
-    for (size_t j = 0; j < h; j++) {
-        for (size_t i = 0; i < w; i++) {
-            f[j * w + i] = (double((uint8_t)frame[(j + y) * picW + (i + x)])) / 255.0;
-        }
-    }
+    RoiRect rt = { x, y, w, h };
+    cropNorm(frame, picW, picH, rt, f);
     preproc(f, cos, fi, w, h);
     dft2d(w, h, fi, Fi);
 
@@ -206,6 +208,7 @@ int Mosse::update(char* frame, int pw, int ph)
     // gi = IDFT(Gi)
     idft2d(w, h, Gi, gi);
 
+    // find peak value position
     int mx = 0, my = 0;
     double max = gi[0];
     for (size_t j = 0; j < h; j++) {
@@ -217,8 +220,47 @@ int Mosse::update(char* frame, int pw, int ph)
             }
         }
     }
+    int dx = (int)floor((double)mx - ((double)w) / 2);
+    int dy = (int)floor((double)my - ((double)h) / 2);
+    printf("INFO: mx = %d, my = %d, dx = %d, dy = %d\n", mx, my, dx, dy);
 
-    printf("INFO: mx = %d, my = %d, dx = %d, dy = %d\n", mx, my, (mx - w/2), (my - h/2));
+    x = x + dx;
+    y = y + dy;
+    out = { x, y, w, h };
+
+    cropNorm(frame, picW, picH, out, f);
+    preproc(f, cos, fi, w, h);
+    dft2d(w, h, fi, Fi);
+
+    // update H1, H2
+    for (size_t j = 0; j < h; j++) {
+        for (size_t i = 0; i < w; i++) {
+            // H1 = rate * (G  * np.conj(Fi)) + (1 - rate) * H1
+            // H2 = rate * (Fi * np.conj(Fi)) + (1 - rate) * H2
+            double a =  G[j * w * 2 + i * 2 + 0];
+            double b =  G[j * w * 2 + i * 2 + 1];
+            double c = Fi[j * w * 2 + i * 2 + 0];
+            double d = Fi[j * w * 2 + i * 2 + 1];
+
+            // (a+bi)*(c-di) = (ac + bd) + (bc-ad)i
+            double gfr = a * c + b * d;
+            double gfi = b * c - a * d;
+
+            // (c+di)*(c-di) = (cc+dd)i
+            double ffr = c * c + d * d;
+            double ffi = 0;
+
+            double h1r = H1[j * w * 2 + i * 2 + 0];
+            double h1i = H1[j * w * 2 + i * 2 + 1];
+            double h2r = H2[j * w * 2 + i * 2 + 0];
+            double h2i = H2[j * w * 2 + i * 2 + 1];
+
+            H1[j * w * 2 + i * 2 + 0] = rate * gfr + (1 - rate) * h1r;
+            H1[j * w * 2 + i * 2 + 1] = rate * gfi + (1 - rate) * h1i;
+            H2[j * w * 2 + i * 2 + 0] = rate * ffr + (1 - rate) * h2r;
+            H2[j * w * 2 + i * 2 + 1] = rate * ffi + (1 - rate) * h2i;
+        }
+    }
 
     return 0;
 }
