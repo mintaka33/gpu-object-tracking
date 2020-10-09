@@ -220,8 +220,8 @@ int Mosse::update(char* frame, int pw, int ph, RoiRect& out)
             }
         }
     }
-    int dx = (int)floor((double)mx - ((double)w) / 2);
-    int dy = (int)floor((double)my - ((double)h) / 2);
+    int dx = (int)round((double)mx - ((double)w) / 2);
+    int dy = (int)round((double)my - ((double)h) / 2);
     printf("INFO: mx = %d, my = %d, dx = %d, dy = %d\n", mx, my, dx, dy);
 
     x = x + dx;
