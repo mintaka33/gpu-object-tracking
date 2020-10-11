@@ -44,7 +44,9 @@ Mosse::Mosse()
 
 Mosse::~Mosse()
 {
-#ifndef USE_OPENCV
+#ifdef USE_OPENCV
+
+#else
     freeArray(curImg);
     freeArray(cos);
     freeArray(f);
@@ -72,53 +74,56 @@ int Mosse::init(char* frame, int pw, int ph, const RoiRect r)
         return -1;
 
     int sz = w * h;
-#ifndef USE_OPENCV
-    cos = allocArray<double>(sz);
-    g = allocArray<double>(sz);
-    f = allocArray<double>(sz);
-    fa = allocArray<double>(sz);
-    fi = allocArray<double>(sz);
-    gi = allocArray<double>(sz);
-#else
+    int sz2 = sz * 2; // size of complex number array
+
+#ifdef USE_OPENCV
     cosMat = new Mat(h, w, CV_64FC1);
     gMat = new Mat(h, w, CV_64FC1);
     fMat = new Mat(h, w, CV_64FC1);
     faMat = new Mat(h, w, CV_64FC1);
     fiMat = new Mat(h, w, CV_64FC1);
     giMat = new Mat(h, w, CV_64FC1);
-    cos = (double*)cosMat->data;// allocArray<double>(sz);
+
+    cos = (double*)cosMat->data;
     g = (double*)gMat->data;
     f = (double*)fMat->data;
     fa = (double*)faMat->data;
     fi = (double*)fiMat->data;
     gi = (double*)giMat->data;
-    memset(gi, 0, sizeof(double) * w * h);
-#endif
 
-    int sz2 = sz * 2; // size of complex number array
-#ifndef USE_OPENCV
-    G = allocArray<double>(sz2);
-    H = allocArray<double>(sz2);
-    H1 = allocArray<double>(sz2);
-    H2 = allocArray<double>(sz2);
-    Fi = allocArray<double>(sz2);
-    Gi = allocArray<double>(sz2);
-#else
+    memset(gi, 0, sizeof(double) * w * h);
+
     GMat = new Mat(h, 2 * w, CV_64FC1);
     HMat = new Mat(h, 2 * w, CV_64FC1);
     H1Mat = new Mat(h, 2 * w, CV_64FC1);
     H2Mat = new Mat(h, 2 * w, CV_64FC1);
     FiMat = new Mat(h, 2 * w, CV_64FC1);
     GiMat = new Mat(h, 2 * w, CV_64FC1);
+
     G = (double*)GMat->data;
     H = (double*)HMat->data;
     H1 = (double*)H1Mat->data;
     H2 = (double*)H2Mat->data;
     Fi = (double*)FiMat->data;
     Gi = (double*)GiMat->data;
+
     memset(H1, 0, sizeof(double) * w * 2 * h);
     memset(H2, 0, sizeof(double) * w * 2 * h);
     memset(Gi, 0, sizeof(double) * w * 2 * h);
+#else
+    cos = allocArray<double>(sz);
+    g = allocArray<double>(sz);
+    f = allocArray<double>(sz);
+    fa = allocArray<double>(sz);
+    fi = allocArray<double>(sz);
+    gi = allocArray<double>(sz);
+
+    G = allocArray<double>(sz2);
+    H = allocArray<double>(sz2);
+    H1 = allocArray<double>(sz2);
+    H2 = allocArray<double>(sz2);
+    Fi = allocArray<double>(sz2);
+    Gi = allocArray<double>(sz2);
 #endif
 
     if (!cos || !g || !f || !fa || !fi || !G || !H || !H1 || !H2 || !Fi || !Gi)
@@ -136,10 +141,10 @@ int Mosse::init(char* frame, int pw, int ph, const RoiRect r)
         getMatrix(w, h, m[0]);
 
         memset(fa, 0, sizeof(double) * w * h);
-#ifndef USE_OPENCV
-        affine(f, w, h, fa, w, h, m);
-#else
+#ifdef USE_OPENCV
         cvAffine(f, w, h, fa, w, h, m);
+#else
+        affine(f, w, h, fa, w, h, m);
 #endif
 
         preproc(fa, cos, fi, w, h);

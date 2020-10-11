@@ -45,6 +45,7 @@ private:
     double* H2 = nullptr;
     double* H = nullptr;
     double* Gi = nullptr;
+
 #ifdef USE_OPENCV
     Mat* cosMat = nullptr;
     Mat* gMat = nullptr;
@@ -59,6 +60,7 @@ private:
     Mat* HMat = nullptr;
     Mat* GiMat = nullptr;
 #endif
+
     bool initStatus = false;
     const int affineNum = 8;
     const double rate = 0.125;
