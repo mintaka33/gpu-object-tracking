@@ -19,6 +19,7 @@ void affine(double* src, int sw, int sh, double* dst, int dw, int dh, double m[2
 
 #ifdef USE_OPENCV
 void cvAffine(double* src, int sw, int sh, double* dst, int dw, int dh, double m[2][3]);
+void cvFFT2d(const size_t w, const size_t h, double* f, double* F);
 #endif
 
 void preproc(double* f, double* cos, double* dst, int w, int h);

@@ -59,11 +59,31 @@ void test_dft()
     dump2text("test_dft_f2", f2, w, h);
 }
 
+void test_cvFFT()
+{
+    int count = 0;
+    const size_t w = 600, h = 400;
+    double* f = new double[w * h];
+    for (size_t y = 0; y < h; y++) {
+        for (size_t x = 0; x < w; x++) {
+            f[y * w + x] = (count++)%256;
+        }
+    }
+    double* F = new double[2 * w * h];
+
+    cvFFT2d(w, h, f, F);
+
+    Mat matF(Size(w, h), CV_64FC2, F);
+
+    delete[] f, F;
+}
+
 int main(int argc, int** argv) 
 {
     //test_preproc();
+    //test_dft();
 
-    test_dft();
+    test_cvFFT();
 
     printf("\ndone\n");
     return 0;

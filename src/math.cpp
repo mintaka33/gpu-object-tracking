@@ -239,6 +239,28 @@ void cvAffine(double* src, int sw, int sh, double* dst, int dw, int dh, double m
         }
     }
 }
+
+void cvFFT2d(const size_t w, const size_t h, double* f, double* F)
+{
+    Mat src(Size(w, h), CV_64FC1), dst;
+    for (size_t y = 0; y < h; y++) {
+        for (size_t x = 0; x < w; x++) {
+            src.at<double>(y, x) = f[y * w + x];
+        }
+    }
+
+    PFU_ENTER;
+    cv::dft(src, dst, DFT_COMPLEX_OUTPUT);
+    PFU_LEAVE;
+
+    for (size_t y = 0; y < h; y++) {
+        for (size_t x = 0; x < 2 * w; x++) {
+            F[y * w * 2 + x + 0] = dst.at<double>(y, x);
+        }
+    }
+
+    return;
+}
 #endif
 
 void preproc(double* f, double* cos, double* dst, int w, int h)
