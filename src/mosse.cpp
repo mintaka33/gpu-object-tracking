@@ -44,7 +44,7 @@ Mosse::Mosse()
 
 Mosse::~Mosse()
 {
-#if !USE_OPENCV
+#ifndef USE_OPENCV
     freeArray(curImg);
     freeArray(cos);
     freeArray(f);
@@ -72,7 +72,7 @@ int Mosse::init(char* frame, int pw, int ph, const RoiRect r)
         return -1;
 
     int sz = w * h;
-#if !USE_OPENCV
+#ifndef USE_OPENCV
     cos = allocArray<double>(sz);
     g = allocArray<double>(sz);
     f = allocArray<double>(sz);
@@ -96,7 +96,7 @@ int Mosse::init(char* frame, int pw, int ph, const RoiRect r)
 #endif
 
     int sz2 = sz * 2; // size of complex number array
-#if !USE_OPENCV
+#ifndef USE_OPENCV
     G = allocArray<double>(sz2);
     H = allocArray<double>(sz2);
     H1 = allocArray<double>(sz2);
@@ -136,7 +136,7 @@ int Mosse::init(char* frame, int pw, int ph, const RoiRect r)
         getMatrix(w, h, m[0]);
 
         memset(fa, 0, sizeof(double) * w * h);
-#if !USE_OPENCV
+#ifndef USE_OPENCV
         affine(f, w, h, fa, w, h, m);
 #else
         cvAffine(f, w, h, fa, w, h, m);

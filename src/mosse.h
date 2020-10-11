@@ -45,7 +45,7 @@ private:
     double* H2 = nullptr;
     double* H = nullptr;
     double* Gi = nullptr;
-#if USE_OPENCV
+#ifdef USE_OPENCV
     Mat* cosMat = nullptr;
     Mat* gMat = nullptr;
     Mat* fMat = nullptr;

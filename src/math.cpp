@@ -220,7 +220,7 @@ void affine(double* src, int sw, int sh, double* dst, int dw, int dh, double m[2
     }
 }
 
-#if USE_OPENCV
+#ifdef USE_OPENCV
 void cvAffine(double* src, int sw, int sh, double* dst, int dw, int dh, double m[2][3])
 {
     Mat src_mat(sh, sw, CV_64FC1, src);
