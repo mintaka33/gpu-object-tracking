@@ -6,10 +6,10 @@
 #include <stdlib.h>
 
 struct RoiRect {
-    int x;
-    int y;
-    int w;
-    int h;
+    size_t x;
+    size_t y;
+    size_t w;
+    size_t h;
 };
 
 class Mosse
@@ -25,12 +25,12 @@ public:
     void dump2bin();
 
 private:
-    int x = 0;
-    int y = 0;
-    int w = 0;
-    int h = 0;
-    int picW = 0;
-    int picH = 0;
+    size_t x = 0;
+    size_t y = 0;
+    size_t w = 0;
+    size_t h = 0;
+    size_t picW = 0;
+    size_t picH = 0;
     int dumpIndex = 0;
     char* curImg = nullptr;
     double* cos = nullptr;
