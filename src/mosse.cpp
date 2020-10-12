@@ -131,7 +131,12 @@ int Mosse::init(char* frame, int pw, int ph, const RoiRect r)
 
     cosWindow(cos, w, h);
     guassian2d(g, w, h);
+
+#ifdef USE_OPENCV
+    cvFFT2d(w, h, g, G);
+#else
     dft2d(w, h, g, G);
+#endif
 
     // load ROI and normalization
     cropNorm(frame, picW, picH, r, f);
@@ -148,8 +153,11 @@ int Mosse::init(char* frame, int pw, int ph, const RoiRect r)
 #endif
 
         preproc(fa, cos, fi, w, h);
-
+#ifdef USE_OPENCV
+        cvFFT2d(w, h, fi, Fi);
+#else
         dft2d(w, h, fi, Fi);
+#endif
 
         // calculate H1, H2
         for (size_t j = 0; j < h; j++) {
@@ -196,7 +204,12 @@ int Mosse::update(char* frame, int pw, int ph, RoiRect& out)
     RoiRect rt = { x, y, w, h };
     cropNorm(frame, picW, picH, rt, f);
     preproc(f, cos, fi, w, h);
+
+#ifdef USE_OPENCV
+    cvFFT2d(w, h, fi, Fi);
+#else
     dft2d(w, h, fi, Fi);
+#endif
 
     // Gi = H * Fi
     for (size_t j = 0; j < h; j++) {
@@ -211,7 +224,11 @@ int Mosse::update(char* frame, int pw, int ph, RoiRect& out)
     }
 
     // gi = IDFT(Gi)
+#ifdef USE_OPENCV
+    cvIFFT2d(w, h, Gi, gi);
+#else
     idft2d(w, h, Gi, gi);
+#endif
 
     // find peak value position
     int mx = 0, my = 0;
@@ -235,7 +252,12 @@ int Mosse::update(char* frame, int pw, int ph, RoiRect& out)
 
     cropNorm(frame, picW, picH, out, f);
     preproc(f, cos, fi, w, h);
+
+#ifdef USE_OPENCV
+    cvFFT2d(w, h, fi, Fi);
+#else
     dft2d(w, h, fi, Fi);
+#endif
 
     // update H1, H2
     for (size_t j = 0; j < h; j++) {
