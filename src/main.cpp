@@ -23,29 +23,52 @@ int main()
 {
     PFU_START("Total");
 
+    char *frame = nullptr;
     size_t picW = 640, picH = 360;
     RoiRect ri = { 270, 160, 53, 33 };
 
     Mosse tracker;
 
-    char* frame = new char[picW * picH];
+#ifdef USE_OPENCV
+    Mat rawMat, inputMat, grayMat;
+    cv::VideoCapture cap("test.265");
+    cap >> rawMat;
+    if (rawMat.empty()) {
+        printf("INFO: input video stream is empty, exiting\n");
+        return -1;
+    }
+    cv::resize(rawMat, inputMat, cv::Size(picW, picH));
+    cvtColor(inputMat, grayMat, COLOR_BGR2GRAY);
+    frame = (char*)grayMat.data;
+#else
+    frame = new char[picW * picH];
     if (loadFrame("input2\\tmp.001.yuv", frame, picW, picH)) {
         return -1;
     }
+#endif
 
     tracker.init(frame, picW, picH, ri);
     //tracker.dump2txt();
 
-    char* frame2 = new char[picW * picH];
     for (size_t i = 2; i <= 250; i++) {
+#ifdef USE_OPENCV
+        cap >> rawMat;
+        if (rawMat.empty()) {
+            printf("INFO: input video stream is empty, exiting\n");
+            return -1;
+    }
+        cv::resize(rawMat, inputMat, cv::Size(picW, picH));
+        cvtColor(inputMat, grayMat, COLOR_BGR2GRAY);
+        frame = (char*)grayMat.data;
+#else
         char filename[256] = {};
         sprintf_s(filename, "input2\\tmp.%03d.yuv", i);
-        if (loadFrame(filename, frame2, picW, picH)) {
+        if (loadFrame(filename, frame, picW, picH)) {
             return -1;
         }
-
+#endif
         RoiRect ro = {};
-        tracker.update(frame2, picW, picH, ro);
+        tracker.update(frame, picW, picH, ro);
 
         tracker.dumpResult();
 
@@ -57,6 +80,10 @@ int main()
 
     PFU_STOP("Total");
 
-    delete[] frame, frame2;
+#ifdef USE_OPENCV
+#else
+    delete[] frame;
+#endif
+
     return 0;
 }

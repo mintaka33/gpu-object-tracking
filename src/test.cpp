@@ -61,6 +61,7 @@ void test_dft()
 
 void test_cvFFT()
 {
+#ifdef USE_OPENCV
     int count = 0;
     const size_t w = 60, h = 40;
     double* f = new double[w * h];
@@ -98,6 +99,7 @@ void test_cvFFT()
     Mat matf2(Size(w, h), CV_64FC1, f2);
 
     delete[] f, F, f2, F2;
+#endif
 }
 
 int main(int argc, int** argv) 
