@@ -261,6 +261,28 @@ void cvFFT2d(const size_t w, const size_t h, double* f, double* F)
 
     return;
 }
+
+void cvIFFT2d(const size_t w, const size_t h, double* F, double* f)
+{
+    Mat src(Size(w, h), CV_64FC2), dst;
+    for (size_t y = 0; y < h; y++) {
+        for (size_t x = 0; x < w*2; x++) {
+            src.at<double>(y, x) = F[y * w * 2 + x + 0];
+        }
+    }
+
+    PFU_ENTER;
+    cv::idft(src, dst, DFT_REAL_OUTPUT);
+    PFU_LEAVE;
+
+    for (size_t y = 0; y < h; y++) {
+        for (size_t x = 0; x < w; x++) {
+            f[y * w + x + 0] = dst.at<double>(y, x)/(w*h);
+        }
+    }
+
+    return;
+}
 #endif
 
 void preproc(double* f, double* cos, double* dst, int w, int h)

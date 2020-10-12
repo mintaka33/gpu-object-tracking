@@ -72,8 +72,10 @@ void test_cvFFT()
     double* F = new double[2 * w * h];
 
     cvFFT2d(w, h, f, F);
-
     Mat matF(Size(w, h), CV_64FC2, F);
+
+    cvIFFT2d(w, h, F, f);
+    Mat matf(Size(w, h), CV_64FC1, f);
 
     delete[] f, F;
 }
