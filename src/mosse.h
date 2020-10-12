@@ -21,6 +21,7 @@ public:
     int init(char* frame, int pw, int ph, const RoiRect r);
     int update(char* frame, int pw, int ph, RoiRect& out);
 
+    void dumpResult();
     void dump2txt();
     void dump2bin();
 
@@ -31,7 +32,7 @@ private:
     size_t h = 0;
     size_t picW = 0;
     size_t picH = 0;
-    int dumpIndex = 0;
+    int frameIndex = 0;
     char* curImg = nullptr;
     double* cos = nullptr;
     double* g = nullptr;
@@ -47,6 +48,7 @@ private:
     double* Gi = nullptr;
 
 #ifdef USE_OPENCV
+    Mat* imgMat = nullptr;
     Mat* cosMat = nullptr;
     Mat* gMat = nullptr;
     Mat* fMat = nullptr;

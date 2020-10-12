@@ -77,6 +77,7 @@ int Mosse::init(char* frame, int pw, int ph, const RoiRect r)
     int sz2 = sz * 2; // size of complex number array
 
 #ifdef USE_OPENCV
+    imgMat = new Mat(picH, picW, CV_8UC1);
     cosMat = new Mat(h, w, CV_64FC1);
     gMat = new Mat(h, w, CV_64FC1);
     fMat = new Mat(h, w, CV_64FC1);
@@ -84,6 +85,7 @@ int Mosse::init(char* frame, int pw, int ph, const RoiRect r)
     fiMat = new Mat(h, w, CV_64FC1);
     giMat = new Mat(h, w, CV_64FC1);
 
+    curImg = (char*)imgMat->data;
     cos = (double*)cosMat->data;
     g = (double*)gMat->data;
     f = (double*)fMat->data;
@@ -111,6 +113,7 @@ int Mosse::init(char* frame, int pw, int ph, const RoiRect r)
     memset(H2, 0, sizeof(double) * w * 2 * h);
     memset(Gi, 0, sizeof(double) * w * 2 * h);
 #else
+    curImg = allocArray<char>(sz);
     cos = allocArray<double>(sz);
     g = allocArray<double>(sz);
     f = allocArray<double>(sz);
@@ -128,6 +131,8 @@ int Mosse::init(char* frame, int pw, int ph, const RoiRect r)
 
     if (!cos || !g || !f || !fa || !fi || !G || !H || !H1 || !H2 || !Fi || !Gi)
         return -1;
+
+    memcpy_s(curImg, picW*picH, frame, picW * picH);
 
     cosWindow(cos, w, h);
     guassian2d(g, w, h);
@@ -179,6 +184,7 @@ int Mosse::init(char* frame, int pw, int ph, const RoiRect r)
     }
 
     initStatus = true;
+    frameIndex++;
 
     return 0;
 }
@@ -187,6 +193,8 @@ int Mosse::update(char* frame, int pw, int ph, RoiRect& out)
 {
     if (pw != picW || ph != picH)
         return -1;
+
+    memcpy_s(curImg, pw * ph, frame, pw * ph);
 
     // calculate H = H1 / H2
     for (size_t j = 0; j < h; j++) {
@@ -289,7 +297,19 @@ int Mosse::update(char* frame, int pw, int ph, RoiRect& out)
         }
     }
 
+    frameIndex++;
     return 0;
+}
+
+void Mosse::dumpResult()
+{
+#ifdef USE_OPENCV
+    char filename[256] = {};
+    sprintf_s(filename, "output/tmp.out.%03d.bmp", frameIndex);
+    cv::rectangle(*imgMat, cv::Rect(x, y, w, h), cv::Scalar(255, 0, 0));
+    cv::imwrite(filename, *imgMat);
+
+#endif
 }
 
 void Mosse::dump2bin()
@@ -297,30 +317,28 @@ void Mosse::dump2bin()
     uint8_t* t = new uint8_t[w * h];
 
     double2uchar(t, f, w, h);
-    dump2yuv("f", t, w, h, dumpIndex);
+    dump2yuv("f", t, w, h, frameIndex);
 
     double2uchar(t, fa, w, h);
-    dump2yuv("fa", t, w, h, dumpIndex);
+    dump2yuv("fa", t, w, h, frameIndex);
 
     delete[] t;
 }
 
 void Mosse::dump2txt()
 {
-    dump2text("cos", cos, w, h, dumpIndex);
-    dump2text("g", g, w, h, dumpIndex);
-    dump2text("f", f, w, h, dumpIndex);
-    dump2text("fa", fa, w, h, dumpIndex);
-    dump2text("fi", fi, w, h, dumpIndex);
-    dump2text("gi", gi, w, h, dumpIndex);
+    dump2text("cos", cos, w, h, frameIndex);
+    dump2text("g", g, w, h, frameIndex);
+    dump2text("f", f, w, h, frameIndex);
+    dump2text("fa", fa, w, h, frameIndex);
+    dump2text("fi", fi, w, h, frameIndex);
+    dump2text("gi", gi, w, h, frameIndex);
 
-    dump2text("G",  G,  2 * w, h, dumpIndex);
-    dump2text("Fi", Fi, 2 * w, h, dumpIndex);
-    dump2text("H1", H1, 2 * w, h, dumpIndex);
-    dump2text("H2", H2, 2 * w, h, dumpIndex);
-    dump2text("H",  H,  2 * w, h, dumpIndex);
-    dump2text("Gi", Gi, 2 * w, h, dumpIndex);
-
-    dumpIndex++;
+    dump2text("G",  G,  2 * w, h, frameIndex);
+    dump2text("Fi", Fi, 2 * w, h, frameIndex);
+    dump2text("H1", H1, 2 * w, h, frameIndex);
+    dump2text("H2", H2, 2 * w, h, frameIndex);
+    dump2text("H",  H,  2 * w, h, frameIndex);
+    dump2text("Gi", Gi, 2 * w, h, frameIndex);
 }
 

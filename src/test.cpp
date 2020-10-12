@@ -62,22 +62,42 @@ void test_dft()
 void test_cvFFT()
 {
     int count = 0;
-    const size_t w = 600, h = 400;
+    const size_t w = 60, h = 40;
     double* f = new double[w * h];
+    double* F = new double[2 * w * h];
     for (size_t y = 0; y < h; y++) {
         for (size_t x = 0; x < w; x++) {
             f[y * w + x] = (count++)%256;
         }
     }
-    double* F = new double[2 * w * h];
 
+    memset(F, 0, sizeof(double) * 2 * w * h);
     cvFFT2d(w, h, f, F);
     Mat matF(Size(w, h), CV_64FC2, F);
 
+
+    memset(f, 0, sizeof(double) * w * h);
     cvIFFT2d(w, h, F, f);
     Mat matf(Size(w, h), CV_64FC1, f);
 
-    delete[] f, F;
+    count = 0;
+    double* f2 = new double[w * h];
+    double* F2 = new double[2 * w * h];
+    for (size_t y = 0; y < h; y++) {
+        for (size_t x = 0; x < w; x++) {
+            f2[y * w + x] = (count++) % 256;
+        }
+    }
+
+    memset(F2, 0, sizeof(double) * 2 * w * h);
+    dft2d(w, h, f2, F2);
+    Mat matF2(Size(w, h), CV_64FC2, F2);
+
+    memset(f2, 0, sizeof(double) * w * h);
+    idft2d(w, h, F2, f2);
+    Mat matf2(Size(w, h), CV_64FC1, f2);
+
+    delete[] f, F, f2, F2;
 }
 
 int main(int argc, int** argv) 
