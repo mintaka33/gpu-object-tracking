@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.0)
 
 project(gpu_math)
 
@@ -10,6 +10,11 @@ link_directories(${OCL_LIB_DIR})
 
 add_executable(gpu_math gpu/host.cpp)
 target_link_libraries(gpu_math OpenCL)
+
+set_target_properties(gpu_math PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin/$<0:>)
+
+file(GLOB OPENCL_KERNEL_FILES "${CMAKE_CURRENT_LIST_DIR}/gpu/*.cl")
+file(COPY ${OPENCL_KERNEL_FILES} DESTINATION ${PROJECT_BINARY_DIR}/bin)
 
 project(mosse)
 
@@ -27,6 +32,9 @@ endif()
 
 add_executable(test test.cpp perf.cpp perf.h math.cpp math.h)
 add_executable(mosse main.cpp perf.cpp perf.h mosse.cpp mosse.h math.cpp math.h)
+
+set_target_properties(test PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin/$<0:>)
+set_target_properties(mosse PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin/$<0:>)
 
 if(WITH_OPENCV)
 target_link_libraries(test ${OpenCV_LIBS})
