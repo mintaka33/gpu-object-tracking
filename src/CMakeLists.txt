@@ -1,5 +1,16 @@
 cmake_minimum_required(VERSION 2.8)
 
+project(gpu_math)
+
+set(OCL_INCLUDE_DIR $ENV{INTELOCLSDKROOT}include)
+set(OCL_LIB_DIR $ENV{INTELOCLSDKROOT}lib/x64)
+
+include_directories(${OCL_INCLUDE_DIR})
+link_directories(${OCL_LIB_DIR})
+
+add_executable(gpu_math gpu/host.cpp)
+target_link_libraries(gpu_math OpenCL)
+
 project(mosse)
 
 set (CMAKE_CXX_STANDARD 11)
@@ -21,3 +32,4 @@ if(WITH_OPENCV)
 target_link_libraries(test ${OpenCV_LIBS})
 target_link_libraries(mosse ${OpenCV_LIBS})
 endif()
+

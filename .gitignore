@@ -4,3 +4,5 @@ build*
 *.txt
 *.265
 __pycache__
+.vscode
+
