@@ -1,7 +1,8 @@
-__kernel void matvec_mult(__global float4* matrix,
-                          __global float4* vector,
-                          __global float* result) 
+
+#define PI 3.1415926
+
+__kernel void cos_win(__global double* out, int m) 
 {
    int i = get_global_id(0);
-   result[i] = dot(matrix[i], vector[0]);
+   out[i] = 0.5 - 0.5 * cos(2 * PI * i / (m - 1));
 }
