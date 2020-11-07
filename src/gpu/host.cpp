@@ -1,6 +1,5 @@
 
 #define PROGRAM_FILE "math.cl"
-#define KERNEL_FUNC "cos_win"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,7 +25,7 @@ int main()
     cl_program program;
     FILE* program_handle;
     size_t program_size, log_size;
-    cl_kernel kernel;
+    cl_kernel kernel, kernel2;
 
     /* Identify a platform */
     err = clGetPlatformIDs(1, &platform, NULL);
@@ -80,8 +79,13 @@ int main()
         exit(1);
     }
 
-    /* Create kernel for the mat_vec_mult function */
-    kernel = clCreateKernel(program, KERNEL_FUNC, &err);
+    kernel = clCreateKernel(program, "hanning", &err);
+    if (err < 0) {
+        perror("Couldn't create the kernel");
+        exit(1);
+    }
+
+    kernel2 = clCreateKernel(program, "gauss2d", &err);
     if (err < 0) {
         perror("Couldn't create the kernel");
         exit(1);
@@ -91,6 +95,12 @@ int main()
 
     /* Create CL buffers to hold input and output data */
     cl_mem cosw = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width, nullptr, &err);
+    if (err < 0) {
+        perror("Couldn't create a buffer object");
+        exit(1);
+    }
+
+    cl_mem cosh = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * height, nullptr, &err);
     if (err < 0) {
         perror("Couldn't create a buffer object");
         exit(1);
@@ -130,9 +140,36 @@ int main()
         exit(1);
     }
 
+    err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &cosh);
+    if (err < 0) {
+        perror("Couldn't set the kernel argument");
+        exit(1);
+    }
+    err = clSetKernelArg(kernel, 1, sizeof(int), (int*)&height);
+    if (err < 0) {
+        perror("Couldn't set the kernel argument");
+        exit(1);
+    }
+
+    err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &height, NULL, 0, NULL, NULL);
+    if (err < 0) {
+        perror("Couldn't enqueue the kernel execution command");
+        exit(1);
+    }
+
+
+    vector<double> host_cosh(height);
+    /* Read the result */
+    err = clEnqueueReadBuffer(queue, cosw, CL_TRUE, 0, sizeof(double) * height, host_cosh.data(), 0, NULL, NULL);
+    if (err < 0) {
+        perror("Couldn't enqueue the read buffer command");
+        exit(1);
+    }
+
 
     /* Deallocate resources */
     clReleaseMemObject(cosw);
+    clReleaseMemObject(cosh);
 
     clReleaseKernel(kernel);
     clReleaseCommandQueue(queue);
