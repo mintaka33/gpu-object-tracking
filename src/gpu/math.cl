@@ -9,6 +9,8 @@ __kernel void hanning(__global double* out, int m)
 
 __kernel void gauss2d(__global double* guass, int w, int h) 
 {
-   int i = get_global_id(0);
-   guass[i] = i;
+   int x = get_global_id(0);
+   int y = get_global_id(1);
+   int i = y * w + x;
+   guass[i] = PI;
 }

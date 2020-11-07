@@ -79,34 +79,43 @@ int main()
         exit(1);
     }
 
+    /* Create a CL command queue for the device*/
+    queue = clCreateCommandQueue(context, device, 0, &err);
+    if (err < 0) {
+        perror("Couldn't create the command queue");
+        exit(1);
+    }
+
+    size_t width = 200, height = 100;
+
     kernel = clCreateKernel(program, "hanning", &err);
     if (err < 0) {
         perror("Couldn't create the kernel");
         exit(1);
     }
-
     kernel2 = clCreateKernel(program, "gauss2d", &err);
     if (err < 0) {
         perror("Couldn't create the kernel");
         exit(1);
     }
 
-    size_t width = 200, height = 100;
-
-    /* Create CL buffers to hold input and output data */
     cl_mem cosw = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width, nullptr, &err);
     if (err < 0) {
         perror("Couldn't create a buffer object");
         exit(1);
     }
-
     cl_mem cosh = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * height, nullptr, &err);
     if (err < 0) {
         perror("Couldn't create a buffer object");
         exit(1);
     }
+    cl_mem guass2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
+    if (err < 0) {
+        perror("Couldn't create a buffer object");
+        exit(1);
+    }
 
-    /* Create kernel arguments from the CL buffers */
+    // cos_w
     err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &cosw);
     if (err < 0) {
         perror("Couldn't set the kernel argument");
@@ -117,15 +126,6 @@ int main()
         perror("Couldn't set the kernel argument");
         exit(1);
     }
-
-    /* Create a CL command queue for the device*/
-    queue = clCreateCommandQueue(context, device, 0, &err);
-    if (err < 0) {
-        perror("Couldn't create the command queue");
-        exit(1);
-    }
-
-    /* Enqueue the command queue to the device */
     err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &width, NULL, 0, NULL, NULL);
     if (err < 0) {
         perror("Couldn't enqueue the kernel execution command");
@@ -133,13 +133,13 @@ int main()
     }
 
     vector<double> host_cosw(width);
-    /* Read the result */
     err = clEnqueueReadBuffer(queue, cosw, CL_TRUE, 0, sizeof(double) * width, host_cosw.data(), 0, NULL, NULL);
     if (err < 0) {
         perror("Couldn't enqueue the read buffer command");
         exit(1);
     }
 
+    // cos_h
     err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &cosh);
     if (err < 0) {
         perror("Couldn't set the kernel argument");
@@ -150,28 +150,56 @@ int main()
         perror("Couldn't set the kernel argument");
         exit(1);
     }
-
     err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &height, NULL, 0, NULL, NULL);
     if (err < 0) {
         perror("Couldn't enqueue the kernel execution command");
         exit(1);
     }
 
-
     vector<double> host_cosh(height);
-    /* Read the result */
     err = clEnqueueReadBuffer(queue, cosw, CL_TRUE, 0, sizeof(double) * height, host_cosh.data(), 0, NULL, NULL);
     if (err < 0) {
         perror("Couldn't enqueue the read buffer command");
         exit(1);
     }
 
+    // guass2d
+    err = clSetKernelArg(kernel2, 0, sizeof(cl_mem), &guass2d);
+    if (err < 0) {
+        perror("Couldn't set the kernel argument");
+        exit(1);
+    }
+    err = clSetKernelArg(kernel2, 1, sizeof(int), (int*)&width);
+    if (err < 0) {
+        perror("Couldn't set the kernel argument");
+        exit(1);
+    }
+    err = clSetKernelArg(kernel2, 2, sizeof(int), (int*)&height);
+    if (err < 0) {
+        perror("Couldn't set the kernel argument");
+        exit(1);
+    }
+    size_t work_size[2] = { height, width };
+    err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, work_size, NULL, 0, NULL, NULL);
+    if (err < 0) {
+        perror("Couldn't enqueue the kernel execution command");
+        exit(1);
+    }
+
+    vector<double> host_guass2d(width * height);
+    err = clEnqueueReadBuffer(queue, guass2d, CL_TRUE, 0, sizeof(double) * width * height, host_guass2d.data(), 0, NULL, NULL);
+    if (err < 0) {
+        perror("Couldn't enqueue the read buffer command");
+        exit(1);
+    }
 
     /* Deallocate resources */
     clReleaseMemObject(cosw);
     clReleaseMemObject(cosh);
+    clReleaseMemObject(guass2d);
 
     clReleaseKernel(kernel);
+    clReleaseKernel(kernel2);
     clReleaseCommandQueue(queue);
     clReleaseProgram(program);
     clReleaseContext(context);
