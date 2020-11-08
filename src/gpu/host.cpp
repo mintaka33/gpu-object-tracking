@@ -1,6 +1,8 @@
 
 #define PROGRAM_FILE "math.cl"
 
+#include "../util.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -86,7 +88,7 @@ int main()
         exit(1);
     }
 
-    size_t width = 5, height = 3;
+    size_t width = 300, height = 200;
 
     kernel = clCreateKernel(program, "hanning", &err);
     if (err < 0) {
@@ -188,13 +190,7 @@ int main()
         perror("Couldn't enqueue the read buffer command");
         exit(1);
     }
-
-    printf("\n");
-    for (auto i: host_guass2d)
-    {
-        printf("%f, ", i);
-    }
-    printf("\n");
+    dump2text("guass2d-gpu", host_guass2d.data(), width, height);
 
     /* Deallocate resources */
     //clReleaseMemObject(cosw);

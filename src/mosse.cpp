@@ -6,6 +6,7 @@
 #include "perf.h"
 #include "mosse.h"
 #include "math.h"
+#include "util.h"
 
 const int maxSize = 4096;
 

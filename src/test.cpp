@@ -11,8 +11,17 @@
 
 #include "perf.h"
 #include "math.h"
+#include "util.h"
 
 using namespace std;
+
+void test_guass2d()
+{
+    size_t w = 300, h = 200;
+    vector<double> guass(w * h);
+    guassian2d(guass.data(), w, h);
+    dump2text("guass2d-cpu", guass.data(), w, h);
+}
 
 void test_preproc()
 {
@@ -104,10 +113,13 @@ void test_cvFFT()
 
 int main(int argc, int** argv) 
 {
+    test_guass2d();
+
     //test_preproc();
+
     //test_dft();
 
-    test_cvFFT();
+    //test_cvFFT();
 
     printf("\ndone\n");
     return 0;

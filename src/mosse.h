@@ -1,5 +1,6 @@
 #pragma once
 #include "math.h"
+#include "util.h"
 
 #include <stdio.h>
 #include <math.h>
