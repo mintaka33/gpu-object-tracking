@@ -86,7 +86,7 @@ int main()
         exit(1);
     }
 
-    size_t width = 200, height = 100;
+    size_t width = 5, height = 3;
 
     kernel = clCreateKernel(program, "hanning", &err);
     if (err < 0) {
@@ -98,24 +98,13 @@ int main()
         perror("Couldn't create the kernel");
         exit(1);
     }
-
+#if 0
+    // cos_w
     cl_mem cosw = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width, nullptr, &err);
     if (err < 0) {
         perror("Couldn't create a buffer object");
         exit(1);
     }
-    cl_mem cosh = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * height, nullptr, &err);
-    if (err < 0) {
-        perror("Couldn't create a buffer object");
-        exit(1);
-    }
-    cl_mem guass2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
-    if (err < 0) {
-        perror("Couldn't create a buffer object");
-        exit(1);
-    }
-
-    // cos_w
     err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &cosw);
     if (err < 0) {
         perror("Couldn't set the kernel argument");
@@ -131,7 +120,6 @@ int main()
         perror("Couldn't enqueue the kernel execution command");
         exit(1);
     }
-
     vector<double> host_cosw(width);
     err = clEnqueueReadBuffer(queue, cosw, CL_TRUE, 0, sizeof(double) * width, host_cosw.data(), 0, NULL, NULL);
     if (err < 0) {
@@ -140,6 +128,11 @@ int main()
     }
 
     // cos_h
+    cl_mem cosh = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * height, nullptr, &err);
+    if (err < 0) {
+        perror("Couldn't create a buffer object");
+        exit(1);
+    }
     err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &cosh);
     if (err < 0) {
         perror("Couldn't set the kernel argument");
@@ -155,15 +148,19 @@ int main()
         perror("Couldn't enqueue the kernel execution command");
         exit(1);
     }
-
     vector<double> host_cosh(height);
     err = clEnqueueReadBuffer(queue, cosw, CL_TRUE, 0, sizeof(double) * height, host_cosh.data(), 0, NULL, NULL);
     if (err < 0) {
         perror("Couldn't enqueue the read buffer command");
         exit(1);
     }
-
+#endif
     // guass2d
+    cl_mem guass2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
+    if (err < 0) {
+        perror("Couldn't create a buffer object");
+        exit(1);
+    }
     err = clSetKernelArg(kernel2, 0, sizeof(cl_mem), &guass2d);
     if (err < 0) {
         perror("Couldn't set the kernel argument");
@@ -179,13 +176,12 @@ int main()
         perror("Couldn't set the kernel argument");
         exit(1);
     }
-    size_t work_size[2] = { height, width };
-    err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, work_size, NULL, 0, NULL, NULL);
+    size_t work_size[2] = { width, height };
+    err = clEnqueueNDRangeKernel(queue, kernel2, 2, NULL, work_size, NULL, 0, NULL, NULL);
     if (err < 0) {
         perror("Couldn't enqueue the kernel execution command");
         exit(1);
     }
-
     vector<double> host_guass2d(width * height);
     err = clEnqueueReadBuffer(queue, guass2d, CL_TRUE, 0, sizeof(double) * width * height, host_guass2d.data(), 0, NULL, NULL);
     if (err < 0) {
@@ -193,9 +189,16 @@ int main()
         exit(1);
     }
 
+    printf("\n");
+    for (auto i: host_guass2d)
+    {
+        printf("%f, ", i);
+    }
+    printf("\n");
+
     /* Deallocate resources */
-    clReleaseMemObject(cosw);
-    clReleaseMemObject(cosh);
+    //clReleaseMemObject(cosw);
+    //clReleaseMemObject(cosh);
     clReleaseMemObject(guass2d);
 
     clReleaseKernel(kernel);
