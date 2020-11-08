@@ -15,6 +15,14 @@
 
 using namespace std;
 
+void test_cos2d()
+{
+    size_t w = 300, h = 200;
+    vector<double> cos2d(w * h);
+    cosWindow(cos2d.data(), w, h);
+    dump2text("cos2d-cpu", cos2d.data(), w, h);
+}
+
 void test_guass2d()
 {
     size_t w = 300, h = 200;
@@ -113,7 +121,9 @@ void test_cvFFT()
 
 int main(int argc, int** argv) 
 {
-    test_guass2d();
+    test_cos2d();
+
+    //test_guass2d();
 
     //test_preproc();
 

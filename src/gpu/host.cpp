@@ -27,7 +27,7 @@ int main()
     cl_program program;
     FILE* program_handle;
     size_t program_size, log_size;
-    cl_kernel kernel, kernel2;
+    cl_kernel kernel, kernel2, kernel3;
 
     /* Identify a platform */
     err = clGetPlatformIDs(1, &platform, NULL);
@@ -95,12 +95,17 @@ int main()
         perror("Couldn't create the kernel");
         exit(1);
     }
-    kernel2 = clCreateKernel(program, "gauss2d", &err);
+    kernel2 = clCreateKernel(program, "cosine2d", &err);
     if (err < 0) {
         perror("Couldn't create the kernel");
         exit(1);
     }
-#if 0
+    kernel3 = clCreateKernel(program, "gauss2d", &err);
+    if (err < 0) {
+        perror("Couldn't create the kernel");
+        exit(1);
+    }
+
     // cos_w
     cl_mem cosw = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width, nullptr, &err);
     if (err < 0) {
@@ -156,30 +161,75 @@ int main()
         perror("Couldn't enqueue the read buffer command");
         exit(1);
     }
-#endif
+
+    // cos_2d
+    cl_mem cos2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
+    if (err < 0) {
+        perror("Couldn't create a buffer object");
+        exit(1);
+    }
+    err = clSetKernelArg(kernel2, 0, sizeof(cl_mem), &cos2d);
+    if (err < 0) {
+        perror("Couldn't set the kernel argument");
+        exit(1);
+    }
+    err = clSetKernelArg(kernel2, 1, sizeof(cl_mem), &cosw);
+    if (err < 0) {
+        perror("Couldn't set the kernel argument");
+        exit(1);
+    }
+    err = clSetKernelArg(kernel2, 2, sizeof(cl_mem), &cosh);
+    if (err < 0) {
+        perror("Couldn't set the kernel argument");
+        exit(1);
+    }
+    err = clSetKernelArg(kernel2, 3, sizeof(int), (int*)&width);
+    if (err < 0) {
+        perror("Couldn't set the kernel argument");
+        exit(1);
+    }
+    err = clSetKernelArg(kernel2, 4, sizeof(int), (int*)&height);
+    if (err < 0) {
+        perror("Couldn't set the kernel argument");
+        exit(1);
+    }
+    size_t cos2d_work_size[2] = { width, height };
+    err = clEnqueueNDRangeKernel(queue, kernel2, 2, NULL, cos2d_work_size, NULL, 0, NULL, NULL);
+    if (err < 0) {
+        perror("Couldn't enqueue the kernel execution command");
+        exit(1);
+    }
+    vector<double> host_cos2d(width* height);
+    err = clEnqueueReadBuffer(queue, cos2d, CL_TRUE, 0, sizeof(double) * width * height, host_cos2d.data(), 0, NULL, NULL);
+    if (err < 0) {
+        perror("Couldn't enqueue the read buffer command");
+        exit(1);
+    }
+    dump2text("cos2d-gpu", host_cos2d.data(), width, height);
+
     // guass2d
     cl_mem guass2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
     if (err < 0) {
         perror("Couldn't create a buffer object");
         exit(1);
     }
-    err = clSetKernelArg(kernel2, 0, sizeof(cl_mem), &guass2d);
+    err = clSetKernelArg(kernel3, 0, sizeof(cl_mem), &guass2d);
     if (err < 0) {
         perror("Couldn't set the kernel argument");
         exit(1);
     }
-    err = clSetKernelArg(kernel2, 1, sizeof(int), (int*)&width);
+    err = clSetKernelArg(kernel3, 1, sizeof(int), (int*)&width);
     if (err < 0) {
         perror("Couldn't set the kernel argument");
         exit(1);
     }
-    err = clSetKernelArg(kernel2, 2, sizeof(int), (int*)&height);
+    err = clSetKernelArg(kernel3, 2, sizeof(int), (int*)&height);
     if (err < 0) {
         perror("Couldn't set the kernel argument");
         exit(1);
     }
     size_t work_size[2] = { width, height };
-    err = clEnqueueNDRangeKernel(queue, kernel2, 2, NULL, work_size, NULL, 0, NULL, NULL);
+    err = clEnqueueNDRangeKernel(queue, kernel3, 2, NULL, work_size, NULL, 0, NULL, NULL);
     if (err < 0) {
         perror("Couldn't enqueue the kernel execution command");
         exit(1);
@@ -193,12 +243,12 @@ int main()
     dump2text("guass2d-gpu", host_guass2d.data(), width, height);
 
     /* Deallocate resources */
-    //clReleaseMemObject(cosw);
-    //clReleaseMemObject(cosh);
+    clReleaseMemObject(cosw);
+    clReleaseMemObject(cosh);
     clReleaseMemObject(guass2d);
 
     clReleaseKernel(kernel);
-    clReleaseKernel(kernel2);
+    clReleaseKernel(kernel3);
     clReleaseCommandQueue(queue);
     clReleaseProgram(program);
     clReleaseContext(context);
