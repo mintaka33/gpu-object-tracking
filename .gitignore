@@ -1,8 +1,10 @@
 build*
+.vscode*
+__pycache__
+
 *.bmp
 *.yuv
 *.txt
 *.265
-__pycache__
-.vscode
+
 
