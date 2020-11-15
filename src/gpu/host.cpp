@@ -158,14 +158,47 @@ void gpu_gauss2d(size_t width, size_t height, cl_mem& guass2d)
     clReleaseKernel(kernel);
 }
 
-int main() 
+void gpu_log(size_t width, size_t height, cl_mem& src, cl_mem& dst)
 {
+    cl_kernel kernel = clCreateKernel(program, "logf", &err);
+    CL_CHECK_ERROR(err, "clCreateKernel");
+
+    err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &src);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel, 1, sizeof(cl_mem), &dst);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel, 2, sizeof(int), (int*)&width);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel, 3, sizeof(int), (int*)&height);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+
+    size_t work_size = width*height;
+    err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &work_size, NULL, 0, NULL, NULL);
+    CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
+
+    vector<double> host_log(width * height);
+    err = clEnqueueReadBuffer(queue, dst, CL_TRUE, 0, sizeof(double) * width * height, host_log.data(), 0, NULL, NULL);
+    CL_CHECK_ERROR(err, "clEnqueueReadBuffer");
+
+    dump2text("log-gpu", host_log.data(), width, height);
+
+    clReleaseKernel(kernel);
+}
+
+int main(int argc, char** argv) 
+{
+    if (argc != 3) {
+        printf("ERROR: Invalid command line\n");
+        return -1;
+    }
+
     cl_int err;
-    size_t width = 300;
-    size_t height = 200;
+    size_t width = atoi(argv[1]);
+    size_t height = atoi(argv[2]);
 
     ocl_init();
 
+#if 0
     cl_mem cosw = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
     gpu_hanning(width, cosw);
@@ -181,10 +214,24 @@ int main()
     cl_mem guass2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
     gpu_gauss2d(width, height, guass2d);
+#endif
 
+    size_t aligned_size = ((width * height + 63) / 64) * 64;
+    uint8_t* d = (uint8_t*)_aligned_malloc(sizeof(uint8_t) * aligned_size, 4096);
+    memset(d, 0, aligned_size);
+    for (size_t i = 0; i < width * height; i++)
+        d[i] = i % 256;
+    cl_mem data_in = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(uint8_t) * width * height, d, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+    cl_mem data_log = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+    gpu_log(width, height, data_in, data_log);
+
+#if 0
     clReleaseMemObject(cosw);
     clReleaseMemObject(cosh);
     clReleaseMemObject(guass2d);
+#endif
     ocl_destroy();
     
     return 0;
