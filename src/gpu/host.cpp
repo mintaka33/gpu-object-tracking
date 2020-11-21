@@ -1,18 +1,19 @@
 
-#define PROGRAM_FILE "math.cl"
-
-#include "../util.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 
+#include <string>
 #include <vector>
 
 #include <CL/cl.h>
 
+#include "../util.h"
+
 using namespace std;
+
+const string kernel_name = "math.cl";
 
 cl_int err;
 cl_platform_id platform;
@@ -29,7 +30,7 @@ if (err < 0 ) { \
 
 void ocl_init()
 {
-    FILE* program_handle;
+    FILE* fp;
     size_t program_size, log_size;
 
     err = clGetPlatformIDs(1, &platform, NULL);
@@ -41,17 +42,21 @@ void ocl_init()
     context = clCreateContext(NULL, 1, &device, NULL, NULL, &err);
     CL_CHECK_ERROR(err, "clCreateContext");
 
-    program_handle = fopen(PROGRAM_FILE, "r");
-    if (program_handle == NULL) {
-        perror("Couldn't find the program file");
-        exit(1);
+    string kernel_path = ".\\" + kernel_name;
+    if (!(fp = fopen(kernel_path.c_str(), "r"))) {
+        printf("INFO: Cannot open kernel file %s, trying another path\n", kernel_path.c_str());
+        kernel_path = "..\\..\\src\\gpu\\" + kernel_name;
+        if (!(fp = fopen(kernel_path.c_str(), "r"))) {
+            printf("ERROR: Cannot open kernel file %s\n", kernel_path.c_str());
+            exit(1);
+        }
     }
-    fseek(program_handle, 0, SEEK_END);
-    program_size = ftell(program_handle);
-    rewind(program_handle);
+    fseek(fp, 0, SEEK_END);
+    program_size = ftell(fp);
+    rewind(fp);
     vector<char> program_buffer(program_size + 1, 0);
-    fread(program_buffer.data(), sizeof(char), program_size, program_handle);
-    fclose(program_handle);
+    fread(program_buffer.data(), sizeof(char), program_size, fp);
+    fclose(fp);
 
     char* prog_buf = program_buffer.data();
     program = clCreateProgramWithSource(context, 1, (const char**)&prog_buf, &program_size, &err);
@@ -219,8 +224,9 @@ int main(int argc, char** argv)
     size_t aligned_size = ((width * height + 63) / 64) * 64;
     uint8_t* d = (uint8_t*)_aligned_malloc(sizeof(uint8_t) * aligned_size, 4096);
     memset(d, 0, aligned_size);
-    for (size_t i = 0; i < width * height; i++)
+    for (size_t i = 0; i < width * height; i++) {
         d[i] = i % 256;
+    }
     cl_mem data_in = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(uint8_t) * width * height, d, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
     cl_mem data_log = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
