@@ -20,7 +20,10 @@ cl_platform_id platform;
 cl_device_id device;
 cl_context context;
 cl_command_queue queue;
+cl_event profile_event;
 cl_program program;
+size_t timer_res;
+cl_ulong time_start, time_end;
 
 #define CL_CHECK_ERROR(err, msg) \
 if (err < 0 ) { \
@@ -71,7 +74,10 @@ void ocl_init()
         exit(1);
     }
 
-    queue = clCreateCommandQueue(context, device, 0, &err);
+    clGetDeviceInfo(device, CL_DEVICE_PROFILING_TIMER_RESOLUTION, sizeof(timer_res), &timer_res, NULL);
+    printf("INFO: Device profiling timer resolution is %lld\n", timer_res);
+
+    queue = clCreateCommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE, &err);
     CL_CHECK_ERROR(err, "clCreateCommandQueue");
 }
 
@@ -80,6 +86,14 @@ void ocl_destroy()
     clReleaseCommandQueue(queue);
     clReleaseProgram(program);
     clReleaseContext(context);
+}
+
+void print_perf()
+{
+    clFinish(queue);
+    clGetEventProfilingInfo(profile_event, CL_PROFILING_COMMAND_START, sizeof(time_start), &time_start, NULL);
+    clGetEventProfilingInfo(profile_event, CL_PROFILING_COMMAND_END, sizeof(time_end), &time_end, NULL);
+    printf("INFO: kernel execution time = %f us\n", (time_end - time_start) * (double)timer_res / 1000.0);
 }
 
 void gpu_hanning(size_t n, cl_mem &cos1d)
@@ -93,8 +107,9 @@ void gpu_hanning(size_t n, cl_mem &cos1d)
     err = clSetKernelArg(kernel, 1, sizeof(int), (int*)&n);
     CL_CHECK_ERROR(err, "clSetKernelArg");
 
-    err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &n, NULL, 0, NULL, NULL);
+    err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &n, NULL, 0, NULL, &profile_event);
     CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
+    print_perf();
 
     vector<double> host_cos1d(n);
     err = clEnqueueReadBuffer(queue, cos1d, CL_TRUE, 0, sizeof(double) * n, host_cos1d.data(), 0, NULL, NULL);
@@ -124,8 +139,9 @@ void gpu_cos2d(size_t width, size_t height, cl_mem& cosw, cl_mem& cosh, cl_mem& 
     CL_CHECK_ERROR(err, "clSetKernelArg");
 
     size_t cos2d_work_size[2] = { width, height };
-    err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, cos2d_work_size, NULL, 0, NULL, NULL);
+    err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, cos2d_work_size, NULL, 0, NULL, &profile_event);
     CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
+    print_perf();
 
     vector<double> host_cos2d(width* height);
     err = clEnqueueReadBuffer(queue, cos2d, CL_TRUE, 0, sizeof(double) * width * height, host_cos2d.data(), 0, NULL, NULL);
@@ -151,8 +167,9 @@ void gpu_gauss2d(size_t width, size_t height, cl_mem& guass2d)
     CL_CHECK_ERROR(err, "clSetKernelArg");
 
     size_t work_size[2] = { width, height };
-    err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, work_size, NULL, 0, NULL, NULL);
+    err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, work_size, NULL, 0, NULL, &profile_event);
     CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
+    print_perf();
 
     vector<double> host_guass2d(width * height);
     err = clEnqueueReadBuffer(queue, guass2d, CL_TRUE, 0, sizeof(double) * width * height, host_guass2d.data(), 0, NULL, NULL);
@@ -178,8 +195,9 @@ void gpu_log(size_t width, size_t height, cl_mem& src, cl_mem& dst)
     CL_CHECK_ERROR(err, "clSetKernelArg");
 
     size_t work_size = width*height;
-    err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &work_size, NULL, 0, NULL, NULL);
+    err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &work_size, NULL, 0, NULL, &profile_event);
     CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
+    print_perf();
 
     vector<double> host_log(width * height);
     err = clEnqueueReadBuffer(queue, dst, CL_TRUE, 0, sizeof(double) * width * height, host_log.data(), 0, NULL, NULL);
@@ -203,7 +221,6 @@ int main(int argc, char** argv)
 
     ocl_init();
 
-#if 0
     cl_mem cosw = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
     gpu_hanning(width, cosw);
@@ -219,7 +236,6 @@ int main(int argc, char** argv)
     cl_mem guass2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
     gpu_gauss2d(width, height, guass2d);
-#endif
 
     size_t aligned_size = ((width * height + 63) / 64) * 64;
     uint8_t* d = (uint8_t*)_aligned_malloc(sizeof(uint8_t) * aligned_size, 4096);
@@ -233,11 +249,10 @@ int main(int argc, char** argv)
     CL_CHECK_ERROR(err, "clCreateBuffer");
     gpu_log(width, height, data_in, data_log);
 
-#if 0
     clReleaseMemObject(cosw);
     clReleaseMemObject(cosh);
     clReleaseMemObject(guass2d);
-#endif
+
     ocl_destroy();
     
     return 0;
