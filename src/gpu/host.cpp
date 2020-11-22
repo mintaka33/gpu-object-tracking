@@ -208,6 +208,51 @@ void gpu_log(size_t width, size_t height, cl_mem& src, cl_mem& dst)
     clReleaseKernel(kernel);
 }
 
+void test_gpu_cos2d(size_t width, size_t height)
+{
+    cl_mem cosw = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+    gpu_hanning(width, cosw);
+
+    cl_mem cosh = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * height, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+    gpu_hanning(height, cosh);
+
+    cl_mem cos2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+    gpu_cos2d(width, height, cosw, cosh, cos2d);
+
+    clReleaseMemObject(cosw);
+    clReleaseMemObject(cosh);
+    clReleaseMemObject(cos2d);
+}
+
+void test_gpu_gauss2d(size_t width, size_t height)
+{
+    cl_mem guass2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+    gpu_gauss2d(width, height, guass2d);
+    clReleaseMemObject(guass2d);
+}
+
+void test_gpu_preproc(size_t width, size_t height)
+{
+    size_t aligned_size = ((width * height + 63) / 64) * 64;
+    uint8_t* d = (uint8_t*)_aligned_malloc(sizeof(uint8_t) * aligned_size, 4096);
+    memset(d, 0, aligned_size);
+    for (size_t i = 0; i < width * height; i++) {
+        d[i] = i % 256;
+    }
+    cl_mem data_in = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(uint8_t) * width * height, d, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+    cl_mem data_log = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+    gpu_log(width, height, data_in, data_log);
+
+    clReleaseMemObject(data_in);
+    clReleaseMemObject(data_log);
+}
+
 int main(int argc, char** argv) 
 {
     if (argc != 3) {
@@ -221,37 +266,11 @@ int main(int argc, char** argv)
 
     ocl_init();
 
-    cl_mem cosw = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width, nullptr, &err);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-    gpu_hanning(width, cosw);
+    test_gpu_cos2d(width, height);
 
-    cl_mem cosh = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * height, nullptr, &err);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-    gpu_hanning(height, cosh);
+    test_gpu_gauss2d(width, height);
 
-    cl_mem cos2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-    gpu_cos2d(width, height, cosw, cosh, cos2d);
-
-    cl_mem guass2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-    gpu_gauss2d(width, height, guass2d);
-
-    size_t aligned_size = ((width * height + 63) / 64) * 64;
-    uint8_t* d = (uint8_t*)_aligned_malloc(sizeof(uint8_t) * aligned_size, 4096);
-    memset(d, 0, aligned_size);
-    for (size_t i = 0; i < width * height; i++) {
-        d[i] = i % 256;
-    }
-    cl_mem data_in = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(uint8_t) * width * height, d, &err);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-    cl_mem data_log = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-    gpu_log(width, height, data_in, data_log);
-
-    clReleaseMemObject(cosw);
-    clReleaseMemObject(cosh);
-    clReleaseMemObject(guass2d);
+    test_gpu_preproc(width, height);
 
     ocl_destroy();
     
