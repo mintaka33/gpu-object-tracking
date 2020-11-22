@@ -93,7 +93,7 @@ void print_perf()
     clFinish(queue);
     clGetEventProfilingInfo(profile_event, CL_PROFILING_COMMAND_START, sizeof(time_start), &time_start, NULL);
     clGetEventProfilingInfo(profile_event, CL_PROFILING_COMMAND_END, sizeof(time_end), &time_end, NULL);
-    printf("INFO: kernel execution time = %f us\n", (time_end - time_start) * (double)timer_res / 1000.0);
+    printf("INFO: kernel execution time = %f us\n", (time_end - time_start) / 1000.0);
 }
 
 void gpu_hanning(size_t n, cl_mem &cos1d)
