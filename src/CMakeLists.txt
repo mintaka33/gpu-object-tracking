@@ -20,13 +20,10 @@ project(mosse)
 
 set (CMAKE_CXX_STANDARD 11)
 
-set (OpenCVPathDebug   "E:/Code/opencv/build2/debug/install")
-set (OpenCVPathRelease "E:/Code/opencv/build2/release/install")
-
 option(WITH_OPENCV "WithOpenCV" ON)
 if(WITH_OPENCV)
     add_compile_definitions(USE_OPENCV)
-    find_package(OpenCV 4.0 REQUIRED PATHS ${OpenCVPathDebug})
+    find_package(OpenCV 4.0 REQUIRED)
     include_directories(${OpenCV_INCLUDE_DIRS})
 endif()
 

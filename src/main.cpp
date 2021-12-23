@@ -24,17 +24,17 @@ int main()
     PFU_START("Total");
 
     char *frame = nullptr;
-    size_t picW = 640, picH = 360;
-    RoiRect ri = { 270, 160, 53, 33 };
+    size_t picW = 1920, picH = 1080;
+    RoiRect ri = { 11, 622, 504, 364 };
 
     Mosse tracker;
 
 #ifdef USE_OPENCV
     Mat rawMat, inputMat, grayMat;
-    cv::VideoCapture cap("test.265");
+    cv::VideoCapture cap("test.264");
     cap >> rawMat;
     if (rawMat.empty()) {
-        printf("INFO: input video stream is empty, exiting\n");
+        printf("ERROR: input video stream is empty, exiting\n");
         return -1;
     }
     cv::resize(rawMat, inputMat, cv::Size(picW, picH));
@@ -43,6 +43,7 @@ int main()
 #else
     frame = new char[picW * picH];
     if (loadFrame("input2\\tmp.001.yuv", frame, picW, picH)) {
+        printf("ERROR: cannot load input yuv files, exiting\n")
         return -1;
     }
 #endif
@@ -50,7 +51,7 @@ int main()
     tracker.init(frame, picW, picH, ri);
     //tracker.dump2txt();
 
-    for (size_t i = 2; i <= 250; i++) {
+    for (size_t i = 2; i <= 256; i++) {
 #ifdef USE_OPENCV
         cap >> rawMat;
         if (rawMat.empty()) {

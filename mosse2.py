@@ -105,7 +105,7 @@ class MOSSE:
 
 def main():
     tracker = None
-    cap = cv2.VideoCapture('test.265')
+    cap = cv2.VideoCapture('test.264')
     if not cap.isOpened():
         print("ERROR: cannot open video file!")
         exit()
