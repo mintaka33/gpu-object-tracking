@@ -6,6 +6,7 @@
 
 #include <string>
 #include <vector>
+#include <fstream>
 
 #include <CL/cl.h>
 
@@ -24,6 +25,15 @@ cl_event profile_event;
 cl_program program;
 size_t timer_res;
 cl_ulong time_start, time_end;
+
+typedef struct _ROI {
+    size_t x;
+    size_t y;
+    size_t width;
+    size_t height;
+} ROI;
+
+static ROI roi = {};
 
 #define CL_CHECK_ERROR(err, msg) \
 if (err < 0 ) { \
@@ -253,24 +263,70 @@ void test_gpu_preproc(size_t width, size_t height)
     clReleaseMemObject(data_log);
 }
 
+void test_gpu_crop(size_t x, size_t y, size_t w, size_t h)
+{
+    size_t fw = 1920, fh = 1080;
+    vector<int8_t> inbuf(fw * fh, 0);
+    string yuvfile = "..\\..\\test.yuv";
+    ifstream infile;
+    infile.open(yuvfile.c_str(), ios::binary);
+    if (!infile.is_open()) {
+        printf("ERROR: failed to open input yuv file %s\n", yuvfile);
+        exit(1);
+    }
+    infile.read((char*)inbuf.data(), fw * fh);
+    infile.close();
+
+    vector<int8_t> outbuf(w*h, 0);
+    for (size_t j = 0; j < h; j++) {
+        for (size_t i = 0; i < w; i++) {
+            outbuf[j * w + i] = inbuf[(y+j)*fw + (x+i)];
+        }
+    }
+    ofstream roifile;
+    roifile.open("..\\..\\roi.yuv", ios::binary);
+    roifile.write((const char*)outbuf.data(), w * h);
+    roifile.close();
+}
+
+void parse_arg(int argc, char** argv)
+{
+    roi.x = 6;
+    roi.y = 599;
+    roi.width = 517;
+    roi.height = 421;
+
+    switch (argc)
+    {
+    case 1:
+        printf("default: x = %d, y =%d, width = %d, height = %d\n", roi.x, roi.y, roi.width, roi.height);
+        break;
+    case 3:
+        roi.width = atoi(argv[1]);
+        roi.height = atoi(argv[2]);
+        break;
+    case 5:
+        roi.width = atoi(argv[1]);
+        roi.height = atoi(argv[2]);
+        break;
+    default:
+        printf("ERROR: invalid command line! exit\n");
+        exit(1);
+        break;
+    }
+}
+
 int main(int argc, char** argv) 
 {
-    if (argc != 3) {
-        printf("ERROR: Invalid command line\n");
-        return -1;
-    }
-
-    cl_int err;
-    size_t width = atoi(argv[1]);
-    size_t height = atoi(argv[2]);
+    parse_arg(argc, argv);
 
     ocl_init();
 
-    test_gpu_cos2d(width, height);
+    //test_gpu_cos2d(roi.width, roi.height);
+    //test_gpu_gauss2d(roi.width, roi.height);
+    //test_gpu_preproc(roi.width, roi.height);
 
-    test_gpu_gauss2d(width, height);
-
-    test_gpu_preproc(width, height);
+    test_gpu_crop(roi.x, roi.y, roi.width, roi.height);
 
     ocl_destroy();
     
