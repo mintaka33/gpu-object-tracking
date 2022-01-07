@@ -59,3 +59,16 @@ __kernel void logf(__global uchar* src, __global double* dst, int w,  int h)
 
     dst[i] = log((double)src[i] / 255.0);
 }
+
+__kernel void crop(__global uchar* src, __global uchar* dst, int srcw,  int srch, int offset_x, int offset_y, int dstw, int dsth)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int size_x = get_global_size(0);
+    int size_y = get_global_size(1);
+
+    if (x == 0 && y == 0)
+        printf("kernel_log:log: size_x = %d, size_y = %d, w = %d, h = %d\n", size_x, size_y, dstw, dsth);
+
+    dst[y*dstw+x] = src[srcw*(offset_y+y)+offset_x+x];
+}

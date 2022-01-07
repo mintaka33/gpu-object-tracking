@@ -218,6 +218,51 @@ void gpu_log(size_t width, size_t height, cl_mem& src, cl_mem& dst)
     clReleaseKernel(kernel);
 }
 
+void gpu_crop(char* src, char* dst, int srcw, int srch, int x, int y, int dstw, int dsth)
+{
+    cl_mem clsrc = clCreateBuffer(context, CL_MEM_READ_ONLY, srcw * srch, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+
+    err = clEnqueueWriteBuffer(queue, clsrc, CL_TRUE, 0, srcw*srch, src, 0, NULL, NULL);
+    CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
+
+    cl_mem cldst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, dstw*dsth, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+
+    cl_kernel kernel = clCreateKernel(program, "crop", &err);
+    CL_CHECK_ERROR(err, "clCreateKernel");
+
+    err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &clsrc);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel, 1, sizeof(cl_mem), &cldst);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel, 2, sizeof(int), (int*)&srcw);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel, 3, sizeof(int), (int*)&srch);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel, 4, sizeof(int), (int*)&x);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel, 5, sizeof(int), (int*)&y);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel, 6, sizeof(int), (int*)&dstw);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel, 7, sizeof(int), (int*)&dsth);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+
+    size_t work_size[2] = { dstw, dsth };
+    err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, work_size, NULL, 0, NULL, &profile_event);
+    CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
+    print_perf();
+
+    vector<char> host_log();
+    err = clEnqueueReadBuffer(queue, cldst, CL_TRUE, 0, dstw*dsth, dst, 0, NULL, NULL);
+    CL_CHECK_ERROR(err, "clEnqueueReadBuffer");
+
+    clReleaseMemObject(clsrc);
+    clReleaseMemObject(cldst);
+    clReleaseKernel(kernel);
+}
+
 void test_gpu_cos2d(size_t width, size_t height)
 {
     cl_mem cosw = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width, nullptr, &err);
@@ -277,16 +322,28 @@ void test_gpu_crop(size_t x, size_t y, size_t w, size_t h)
     infile.read((char*)inbuf.data(), fw * fh);
     infile.close();
 
-    vector<int8_t> outbuf(w*h, 0);
+    vector<int8_t> outgpu(w * h, 0);
+    gpu_crop((char*)inbuf.data(), (char*)outgpu.data(), fw, fh, x, y, w, h);
+
+    vector<int8_t> outref(w*h, 0);
     for (size_t j = 0; j < h; j++) {
         for (size_t i = 0; i < w; i++) {
-            outbuf[j * w + i] = inbuf[(y+j)*fw + (x+i)];
+            outref[j * w + i] = inbuf[(y+j)*fw + (x+i)];
         }
     }
-    ofstream roifile;
-    roifile.open("..\\..\\roi.yuv", ios::binary);
-    roifile.write((const char*)outbuf.data(), w * h);
-    roifile.close();
+    //ofstream roifile;
+    //roifile.open("..\\..\\roi.yuv", ios::binary);
+    //roifile.write((const char*)outref.data(), w * h);
+    //roifile.close();
+
+    // compare gpu output and reference
+    int mismatch_count = 0;
+    for (size_t i = 0; i < w*h; i++) {
+        if (outgpu[i] != outref[i]) {
+            mismatch_count++;
+        }
+    }
+    printf("INFO: test_gpu_crop mismatch_count =%d\n", mismatch_count);
 }
 
 void parse_arg(int argc, char** argv)
