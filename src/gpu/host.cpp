@@ -218,17 +218,8 @@ void gpu_log(size_t width, size_t height, cl_mem& src, cl_mem& dst)
     clReleaseKernel(kernel);
 }
 
-void gpu_crop(char* src, char* dst, int srcw, int srch, int x, int y, int dstw, int dsth)
+void gpu_crop(cl_mem clsrc, cl_mem cldst, int srcw, int srch, int x, int y, int dstw, int dsth)
 {
-    cl_mem clsrc = clCreateBuffer(context, CL_MEM_READ_ONLY, srcw * srch, nullptr, &err);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-
-    err = clEnqueueWriteBuffer(queue, clsrc, CL_TRUE, 0, srcw*srch, src, 0, NULL, NULL);
-    CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
-
-    cl_mem cldst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, dstw*dsth, nullptr, &err);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-
     cl_kernel kernel = clCreateKernel(program, "crop", &err);
     CL_CHECK_ERROR(err, "clCreateKernel");
 
@@ -254,12 +245,6 @@ void gpu_crop(char* src, char* dst, int srcw, int srch, int x, int y, int dstw, 
     CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
     print_perf();
 
-    vector<char> host_log();
-    err = clEnqueueReadBuffer(queue, cldst, CL_TRUE, 0, dstw*dsth, dst, 0, NULL, NULL);
-    CL_CHECK_ERROR(err, "clEnqueueReadBuffer");
-
-    clReleaseMemObject(clsrc);
-    clReleaseMemObject(cldst);
     clReleaseKernel(kernel);
 }
 
@@ -308,10 +293,8 @@ void test_gpu_preproc(size_t width, size_t height)
     clReleaseMemObject(data_log);
 }
 
-void test_gpu_crop(size_t x, size_t y, size_t w, size_t h)
+void init_srcbuf(char* buf, int size)
 {
-    size_t fw = 1920, fh = 1080;
-    vector<int8_t> inbuf(fw * fh, 0);
     string yuvfile = "..\\..\\test.yuv";
     ifstream infile;
     infile.open(yuvfile.c_str(), ios::binary);
@@ -319,16 +302,34 @@ void test_gpu_crop(size_t x, size_t y, size_t w, size_t h)
         printf("ERROR: failed to open input yuv file %s\n", yuvfile);
         exit(1);
     }
-    infile.read((char*)inbuf.data(), fw * fh);
+    infile.read(buf, size);
     infile.close();
+}
+
+void test_gpu_crop(size_t x, size_t y, size_t w, size_t h)
+{
+    size_t srcw = 1920, srch = 1080;
+    vector<int8_t> inbuf(srcw * srch, 0);
+    init_srcbuf((char*)inbuf.data(), srcw * srch); 
 
     vector<int8_t> outgpu(w * h, 0);
-    gpu_crop((char*)inbuf.data(), (char*)outgpu.data(), fw, fh, x, y, w, h);
+    cl_mem clsrc = clCreateBuffer(context, CL_MEM_READ_ONLY, srcw * srch, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+    err = clEnqueueWriteBuffer(queue, clsrc, CL_TRUE, 0, srcw * srch, inbuf.data(), 0, NULL, NULL);
+    CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
+    cl_mem cldst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, w * h, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
 
+    gpu_crop(clsrc, cldst, srcw, srch, x, y, w, h);
+
+    err = clEnqueueReadBuffer(queue, cldst, CL_TRUE, 0, w * h, outgpu.data(), 0, NULL, NULL);
+    CL_CHECK_ERROR(err, "clEnqueueReadBuffer");
+
+    // generate reference
     vector<int8_t> outref(w*h, 0);
     for (size_t j = 0; j < h; j++) {
         for (size_t i = 0; i < w; i++) {
-            outref[j * w + i] = inbuf[(y+j)*fw + (x+i)];
+            outref[j * w + i] = inbuf[(y+j)*srcw + (x+i)];
         }
     }
     //ofstream roifile;
@@ -344,6 +345,9 @@ void test_gpu_crop(size_t x, size_t y, size_t w, size_t h)
         }
     }
     printf("INFO: test_gpu_crop mismatch_count =%d\n", mismatch_count);
+
+    clReleaseMemObject(clsrc);
+    clReleaseMemObject(cldst);
 }
 
 void parse_arg(int argc, char** argv)
