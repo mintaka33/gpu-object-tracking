@@ -2,12 +2,17 @@
 #define PI 3.1415926
 #define SIGMA 2.0
 
+#define KERNEL_LOG 0
+
 __kernel void hanning(__global double* out, int m) 
 {
     int i = get_global_id(0);
     int size = get_global_size(0);
+
+#if KERNEL_LOG
     if (i == 0)
         printf("kernel_log:hanning: size = %d, m = %d\n", size, m);
+#endif
 
     out[i] = 0.5 - 0.5 * cos(2 * PI * i / (m - 1));
 }
@@ -20,8 +25,10 @@ __kernel void cosine2d(__global double* cos2d, __global double* cosw, __global d
     int size_y = get_global_size(1);
     int i = y * w + x;
 
+#if KERNEL_LOG
     if (x == 0 && y == 0)
         printf("kernel_log:cosine2d: size_x = %d, size_y = %d, w = %d, h = %d\n", size_x, size_y, w, h);
+#endif
 
     cos2d[i] = sqrt(cosw[x] * cosh[y]);
 }
@@ -34,8 +41,10 @@ __kernel void gauss2d(__global double* guass, int w, int h)
     int size_y = get_global_size(1);
     int i = y * w + x;
 
+#if KERNEL_LOG
     if (x == 0 && y == 0)
         printf("kernel_log:gauss2d: size_x = %d, size_y = %d, w = %d, h = %d\n", size_x, size_y, w, h);
+#endif
 
     double hw = ((double)w)/2;
     double hh = ((double)h)/2;
@@ -54,8 +63,10 @@ __kernel void logf(__global uchar* src, __global double* dst, int w,  int h)
     int size_y = get_global_size(1);
     int i = y * w + x;
 
+#if KERNEL_LOG
     if (x == 0 && y == 0)
         printf("kernel_log:logf: size_x = %d, size_y = %d, w = %d, h = %d\n", size_x, size_y, w, h);
+#endif
 
     dst[i] = log((double)src[i] / 255.0);
 }
@@ -67,8 +78,10 @@ __kernel void crop(__global uchar* src, __global uchar* dst, int srcw,  int srch
     int size_x = get_global_size(0);
     int size_y = get_global_size(1);
 
+#if KERNEL_LOG
     if (x == 0 && y == 0)
         printf("kernel_log:crop: size_x = %d, size_y = %d, w = %d, h = %d\n", size_x, size_y, dstw, dsth);
+#endif
 
     dst[y*dstw+x] = src[srcw*(offset_y+y)+offset_x+x];
 }
@@ -80,10 +93,12 @@ __kernel void affine(__global uchar* src, __global uchar* dst, __global double* 
     int size_x = get_global_size(0);
     int size_y = get_global_size(1);
 
+#if KERNEL_LOG
     if (i == 0 && j == 0) {
         printf("kernel_log:affine: size_x = %d, size_y = %d, w = %d, h = %d\n", size_x, size_y, w, h);
         printf("kernel_log:affine: matrix = \n %f, %f, %f, \n %f, %f, %f\n", mat[0], mat[1], mat[2], mat[3], mat[4], mat[5]);
     }
+#endif
 
     double yp = 0;
     double x1, y1, x2, y2, x, y;
@@ -113,9 +128,7 @@ __kernel void affine(__global uchar* src, __global uchar* dst, __global double* 
     q21 = src[(y2i * w + x1i)];
     q22 = src[(y2i * w + x2i)];
 
-    // yp = bilinear(q11[0], q12[0], q21[0], q22[0], x1, y1, x2, y2, x, y);
-    // bilinear(double q11, double q12, double q21, double q22, double x1, double y1, double x2, double y2, double x, double y)
-
+    // bi-linear interpolation
     double r1, r2, p;
     r1 = (x2 - x) * q11 / (x2 - x1) + (x - x1) * q12 / (x2 - x1);
     r2 = (x2 - x) * q21 / (x2 - x1) + (x - x1) * q22 / (x2 - x1);
