@@ -11,6 +11,7 @@
 #include <CL/cl.h>
 
 #include "../util.h"
+#include "../math.h"
 
 using namespace std;
 
@@ -248,6 +249,36 @@ void gpu_crop(cl_mem clsrc, cl_mem cldst, int srcw, int srch, int x, int y, int 
     clReleaseKernel(kernel);
 }
 
+void gpu_affine(cl_mem clsrc, cl_mem cldst, int w, int h, double m[2][3])
+{
+    cl_kernel kernel = clCreateKernel(program, "affine", &err);
+    CL_CHECK_ERROR(err, "clCreateKernel");
+
+    cl_mem clmatrix = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(double) * 2 * 3, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+    err = clEnqueueWriteBuffer(queue, clmatrix, CL_TRUE, 0, sizeof(double) * 2 * 3, &m[0][0], 0, NULL, NULL);
+    CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
+
+    err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &clsrc);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel, 1, sizeof(cl_mem), &cldst);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel, 2, sizeof(cl_mem), &clmatrix);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel, 3, sizeof(int), (int*)&w);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel, 4, sizeof(int), (int*)&h);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+
+    size_t work_size[2] = { w, h };
+    err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, work_size, NULL, 0, NULL, &profile_event);
+    CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
+    print_perf();
+
+    clReleaseMemObject(clmatrix);
+    clReleaseKernel(kernel);
+}
+
 void test_gpu_cos2d(size_t width, size_t height)
 {
     cl_mem cosw = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width, nullptr, &err);
@@ -306,23 +337,23 @@ void init_srcbuf(char* buf, int size)
     infile.close();
 }
 
-void test_gpu_crop(size_t x, size_t y, size_t w, size_t h)
+void test_gpu_affine(size_t x, size_t y, size_t w, size_t h)
 {
     size_t srcw = 1920, srch = 1080;
     vector<int8_t> inbuf(srcw * srch, 0);
     init_srcbuf((char*)inbuf.data(), srcw * srch); 
 
     vector<int8_t> outgpu(w * h, 0);
-    cl_mem clsrc = clCreateBuffer(context, CL_MEM_READ_ONLY, srcw * srch, nullptr, &err);
+    cl_mem crop_src = clCreateBuffer(context, CL_MEM_READ_ONLY, srcw * srch, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
-    err = clEnqueueWriteBuffer(queue, clsrc, CL_TRUE, 0, srcw * srch, inbuf.data(), 0, NULL, NULL);
+    err = clEnqueueWriteBuffer(queue, crop_src, CL_TRUE, 0, srcw * srch, inbuf.data(), 0, NULL, NULL);
     CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
-    cl_mem cldst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, w * h, nullptr, &err);
+    cl_mem crop_dst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, w * h, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
 
-    gpu_crop(clsrc, cldst, srcw, srch, x, y, w, h);
+    gpu_crop(crop_src, crop_dst, srcw, srch, x, y, w, h);
 
-    err = clEnqueueReadBuffer(queue, cldst, CL_TRUE, 0, w * h, outgpu.data(), 0, NULL, NULL);
+    err = clEnqueueReadBuffer(queue, crop_dst, CL_TRUE, 0, w * h, outgpu.data(), 0, NULL, NULL);
     CL_CHECK_ERROR(err, "clEnqueueReadBuffer");
 
     // generate reference
@@ -346,8 +377,26 @@ void test_gpu_crop(size_t x, size_t y, size_t w, size_t h)
     }
     printf("INFO: test_gpu_crop mismatch_count =%d\n", mismatch_count);
 
-    clReleaseMemObject(clsrc);
-    clReleaseMemObject(cldst);
+    cl_mem affine_dst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, w * h, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+
+    double m[2][3] = {};
+    getMatrix(w, h, m[0]);
+    printf("host matrix = \n %f, %f, %f \n %f, %f, %f \n", m[0][0], m[0][1], m[0][2], m[1][0], m[1][1], m[1][2]);
+
+    gpu_affine(crop_dst, affine_dst, w, h, m);
+
+    vector<int8_t> affout(w * h, 0);
+    err = clEnqueueReadBuffer(queue, affine_dst, CL_TRUE, 0, w * h, affout.data(), 0, NULL, NULL);
+    CL_CHECK_ERROR(err, "clEnqueueReadBuffer");
+    ofstream aff_file;
+    aff_file.open("..\\..\\aff.yuv", ios::binary);
+    aff_file.write((const char*)affout.data(), w * h);
+    aff_file.close();
+
+    clReleaseMemObject(crop_src);
+    clReleaseMemObject(crop_dst);
+    clReleaseMemObject(affine_dst);
 }
 
 void parse_arg(int argc, char** argv)
@@ -387,7 +436,7 @@ int main(int argc, char** argv)
     //test_gpu_gauss2d(roi.width, roi.height);
     //test_gpu_preproc(roi.width, roi.height);
 
-    test_gpu_crop(roi.x, roi.y, roi.width, roi.height);
+    test_gpu_affine(roi.x, roi.y, roi.width, roi.height);
 
     ocl_destroy();
     

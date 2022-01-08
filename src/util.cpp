@@ -1,5 +1,42 @@
 #include <fstream>
 #include <stdint.h>
+#include <iomanip>
+#include <random>
+#include <chrono>
+
+void getMatrix(int w, int h, double* mat)
+{
+    double r[5] = {};
+    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+    std::default_random_engine generator(seed);
+    std::uniform_real_distribution<double> distribution(-0.1, 0.1);
+    for (size_t i = 0; i < 5; i++) {
+        r[i] = distribution(generator); // (-0.1, 0.1)
+    }
+
+    //srand(time(NULL));
+    //for (size_t i = 0; i < 5; i++) {
+    //    r[i] = (((double)rand() / (RAND_MAX)) - 0.5) * 0.2; // (-0.1, 0.1)
+    //}
+
+    double c = cos(r[0]);
+    double s = sin(r[0]);
+    double m[2][3] = {};
+    m[0][0] = c + r[1];
+    m[0][1] = -s + r[2];
+    m[1][0] = s + r[3];
+    m[1][1] = c + r[4];
+    double c1 = w / 2.0, c2 = h / 2.0;
+    double t1 = m[0][0] * c1 + m[0][1] * c2;
+    double t2 = m[1][0] * c1 + m[1][1] * c2;
+    m[0][2] = c1 - t1;
+    m[1][2] = c2 - t2;
+
+    mat[0] = m[0][0], mat[1] = m[0][1], mat[2] = m[0][2];
+    mat[3] = m[1][0], mat[4] = m[1][1], mat[5] = m[1][2];
+
+    //printf("%10.6f, %10.6f, %10.6f, %10.6f, %10.6f, %10.6f\n", mat[0], mat[1], mat[2], mat[3], mat[4], mat[5]);
+}
 
 void dump2text(char* tag, double* data, const int w, const int h, int i)
 {

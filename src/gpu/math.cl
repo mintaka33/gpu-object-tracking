@@ -55,7 +55,7 @@ __kernel void logf(__global uchar* src, __global double* dst, int w,  int h)
     int i = y * w + x;
 
     if (x == 0 && y == 0)
-        printf("kernel_log:log: size_x = %d, size_y = %d, w = %d, h = %d\n", size_x, size_y, w, h);
+        printf("kernel_log:logf: size_x = %d, size_y = %d, w = %d, h = %d\n", size_x, size_y, w, h);
 
     dst[i] = log((double)src[i] / 255.0);
 }
@@ -68,7 +68,58 @@ __kernel void crop(__global uchar* src, __global uchar* dst, int srcw,  int srch
     int size_y = get_global_size(1);
 
     if (x == 0 && y == 0)
-        printf("kernel_log:log: size_x = %d, size_y = %d, w = %d, h = %d\n", size_x, size_y, dstw, dsth);
+        printf("kernel_log:crop: size_x = %d, size_y = %d, w = %d, h = %d\n", size_x, size_y, dstw, dsth);
 
     dst[y*dstw+x] = src[srcw*(offset_y+y)+offset_x+x];
+}
+
+__kernel void affine(__global uchar* src, __global uchar* dst, __global double* mat, int w,  int h)
+{
+    int i = get_global_id(0);
+    int j = get_global_id(1);
+    int size_x = get_global_size(0);
+    int size_y = get_global_size(1);
+
+    if (i == 0 && j == 0) {
+        printf("kernel_log:affine: size_x = %d, size_y = %d, w = %d, h = %d\n", size_x, size_y, w, h);
+        printf("kernel_log:affine: matrix = \n %f, %f, %f, \n %f, %f, %f\n", mat[0], mat[1], mat[2], mat[3], mat[4], mat[5]);
+    }
+
+    double yp = 0;
+    double x1, y1, x2, y2, x, y;
+    double q11, q12, q21, q22;
+    int x1i, y1i, x2i, y2i;
+
+    x = mat[0] * i + mat[1] * j + mat[2] * 1;
+    y = mat[3] * i + mat[4] * j + mat[5] * 1;
+
+    x = (x < 0) ? 0.0 : x;
+    y = (y < 0) ? 0.0 : y;
+    x = (x > (w - 2)) ? (w - 2) : x;
+    y = (y > (h - 2)) ? (h - 2) : y;
+
+    x1 = floor(x);
+    y1 = floor(y);
+    x1i = (int)x1;
+    y1i = (int)y1;
+
+    x2 = x1 + 1;
+    y2 = y1 + 1;
+    x2i = (int)x2;
+    y2i = (int)y2;
+
+    q11 = src[(y1i * w + x1i)];
+    q12 = src[(y1i * w + x2i)];
+    q21 = src[(y2i * w + x1i)];
+    q22 = src[(y2i * w + x2i)];
+
+    // yp = bilinear(q11[0], q12[0], q21[0], q22[0], x1, y1, x2, y2, x, y);
+    // bilinear(double q11, double q12, double q21, double q22, double x1, double y1, double x2, double y2, double x, double y)
+
+    double r1, r2, p;
+    r1 = (x2 - x) * q11 / (x2 - x1) + (x - x1) * q12 / (x2 - x1);
+    r2 = (x2 - x) * q21 / (x2 - x1) + (x - x1) * q22 / (x2 - x1);
+    p = (y2 - y) * r1 / (y2 - y1) + (y - y1) * r2 / (y2 - y1);
+
+    dst[(j * w + i)] = p;
 }
