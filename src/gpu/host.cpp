@@ -13,6 +13,9 @@
 #include "../util.h"
 #include "../math.h"
 
+#define VKFFT_BACKEND 3
+#include "vkFFT.h"
+
 using namespace std;
 
 const string kernel_name = "math.cl";
@@ -27,6 +30,14 @@ cl_program program;
 size_t timer_res;
 cl_ulong time_start, time_end;
 
+typedef struct {
+    cl_platform_id platform;
+    cl_device_id device;
+    cl_context context;
+    cl_command_queue commandQueue;
+    uint64_t device_id;
+} VkGPU;
+
 typedef struct _ROI {
     size_t x;
     size_t y;
@@ -35,6 +46,7 @@ typedef struct _ROI {
 } ROI;
 
 static ROI roi = {};
+static int g_dump_result = false;
 
 #define CL_CHECK_ERROR(err, msg) \
 if (err < 0 ) { \
@@ -105,6 +117,19 @@ void print_perf()
     clGetEventProfilingInfo(profile_event, CL_PROFILING_COMMAND_START, sizeof(time_start), &time_start, NULL);
     clGetEventProfilingInfo(profile_event, CL_PROFILING_COMMAND_END, sizeof(time_end), &time_end, NULL);
     printf("INFO: kernel execution time = %f us\n", (time_end - time_start) / 1000.0);
+}
+
+void init_srcbuf(char* buf, int size)
+{
+    string yuvfile = "..\\..\\test.yuv";
+    ifstream infile;
+    infile.open(yuvfile.c_str(), ios::binary);
+    if (!infile.is_open()) {
+        printf("ERROR: failed to open input yuv file %s\n", yuvfile);
+        exit(1);
+    }
+    infile.read(buf, size);
+    infile.close();
 }
 
 void gpu_hanning(size_t n, cl_mem &cos1d)
@@ -279,6 +304,133 @@ void gpu_affine(cl_mem clsrc, cl_mem cldst, int w, int h, double m[2][3])
     clReleaseKernel(kernel);
 }
 
+VkFFTResult gpu_fft(VkGPU* vkGPU, int w, int h)
+{
+    cl_int res = CL_SUCCESS;
+    //zero-initialize configuration + FFT application
+    VkFFTConfiguration configuration = {};
+    VkFFTApplication app = {};
+    configuration.FFTdim = 2; //FFT dimension, 1D, 2D or 3D
+    configuration.size[0] = w;
+    configuration.size[1] = h;
+    configuration.numberBatches = 0;
+    //configuration.performR2C = 1; // perform R2C/C2R decomposition (0 - off, 1 - on)
+    uint64_t num_items = configuration.size[0] * configuration.size[1];
+
+    // out-of-place R2C FFT with custom strides
+    uint64_t inputBufferSize = sizeof(float) * 2 * num_items;
+    uint64_t outputBufferSize = sizeof(float) * 2 * num_items;
+    uint64_t bufferSize = sizeof(float) * 2 * num_items; // (configuration.size[0] / 2 + 1)* configuration.size[1];
+
+    configuration.isInputFormatted = 1;
+    configuration.inputBufferStride[0] = configuration.size[0];
+    configuration.inputBufferStride[1] = configuration.inputBufferStride[0] * configuration.size[1];
+    configuration.bufferStride[0] = configuration.size[0];
+    configuration.bufferStride[1] = configuration.bufferStride[0] * configuration.size[1];
+
+    vector<float> indata(2 * num_items, 0);
+    vector<float> outdata(2 * num_items, 0);
+    for (size_t i = 0; i < 2 * num_items; i += 2) {
+        indata[i] = i;
+    }
+
+    configuration.device = &vkGPU->device;
+    configuration.platform = &vkGPU->platform;
+    configuration.context = &vkGPU->context;
+
+    // input buffer in device
+    cl_mem clinbuffer = clCreateBuffer(vkGPU->context, CL_MEM_READ_WRITE, inputBufferSize, 0, &res);
+    if (res != CL_SUCCESS)
+        return VKFFT_ERROR_FAILED_TO_ALLOCATE;
+    res = clEnqueueWriteBuffer(vkGPU->commandQueue, clinbuffer, CL_TRUE, 0, inputBufferSize, indata.data(), 0, NULL, NULL);
+    if (res != CL_SUCCESS)
+        return VKFFT_ERROR_FAILED_TO_COPY;
+
+    // computation buffer in device
+    cl_mem clbuffer = clCreateBuffer(vkGPU->context, CL_MEM_READ_WRITE, bufferSize, 0, &res);
+    if (res != CL_SUCCESS)
+        return VKFFT_ERROR_FAILED_TO_ALLOCATE;
+
+    // output buffer in device
+    cl_mem cloutbuffer = clCreateBuffer(vkGPU->context, CL_MEM_READ_WRITE, outputBufferSize, 0, &res);
+    if (res != CL_SUCCESS)
+        return VKFFT_ERROR_FAILED_TO_ALLOCATE;
+
+    configuration.inputBuffer = &clinbuffer;
+    configuration.inputBufferSize = &inputBufferSize;
+    configuration.buffer = &clbuffer;
+    configuration.bufferSize = &bufferSize;
+    //configuration.outputBuffer = &cloutbuffer;
+    //configuration.outputBufferSize = &outputBufferSize;
+
+    VkFFTResult resFFT = initializeVkFFT(&app, configuration);
+    if (resFFT != VKFFT_SUCCESS && resFFT != VKFFT_ERROR_ENABLED_saveApplicationToString) {
+        printf("ERROR: initializeVkFFT failed with resFFT = %d\n", resFFT);
+        return resFFT;
+    }
+
+    VkFFTLaunchParams launchParams = {};
+    launchParams.inputBuffer = &clinbuffer;
+    launchParams.buffer = &clbuffer;
+    //launchParams.outputBuffer = &cloutbuffer;
+    launchParams.commandQueue = &vkGPU->commandQueue;
+
+    // FFT
+    resFFT = VkFFTAppend(&app, -1, &launchParams);
+    if (resFFT != VKFFT_SUCCESS) {
+        printf("ERROR: FFT failed with resFFT = %d\n", resFFT);
+        return resFFT;
+    }
+    clFinish(vkGPU->commandQueue);
+
+    res = clEnqueueReadBuffer(vkGPU->commandQueue, clbuffer, CL_TRUE, 0, bufferSize, outdata.data(), 0, NULL, NULL);
+    if (res != CL_SUCCESS)
+        return VKFFT_ERROR_FAILED_TO_COPY;
+    clFinish(vkGPU->commandQueue);
+    if (g_dump_result) {
+        ofstream outfile("result.txt");
+        for (size_t y = 0; y < h; y++) {
+            for (size_t x = 0; x < 2 * w; x++) {
+                outfile << outdata[y * 2 * w + x] / 2 << ", ";
+            }
+            outfile << "\n";
+        }
+        //for (size_t i = 0; i < 2 * num_items; i++) {
+        //    if (i % 16 == 0) printf("\n");
+        //    printf("%f, ", outdata[i]);
+        //}
+        //printf("\n");
+    }
+
+#if 0
+    // IFFT
+    resFFT = VkFFTAppend(&app, 1, &launchParams);
+    if (resFFT != VKFFT_SUCCESS) {
+        printf("ERROR: IFFT failed with resFFT = %d\n", resFFT);
+        return resFFT;
+    }
+    clFinish(vkGPU->commandQueue);
+
+    res = clEnqueueReadBuffer(vkGPU->commandQueue, clbuffer, CL_TRUE, 0, bufferSize, outdata.data(), 0, NULL, NULL);
+    if (res != CL_SUCCESS)
+        return VKFFT_ERROR_FAILED_TO_COPY;
+    clFinish(vkGPU->commandQueue);
+
+    for (size_t i = 0; i < 2 * num_items; i++) {
+        if (i % 16 == 0) printf("\n");
+        printf("%f, ", outdata[i] / 256);
+    }
+    printf("\n");
+#endif
+
+    clReleaseMemObject(clbuffer);
+    clReleaseMemObject(clinbuffer);
+    clReleaseMemObject(cloutbuffer);
+    deleteVkFFT(&app);
+
+    return VKFFT_SUCCESS;
+}
+
 void test_gpu_cos2d(size_t width, size_t height)
 {
     cl_mem cosw = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width, nullptr, &err);
@@ -322,19 +474,6 @@ void test_gpu_preproc(size_t width, size_t height)
 
     clReleaseMemObject(data_in);
     clReleaseMemObject(data_log);
-}
-
-void init_srcbuf(char* buf, int size)
-{
-    string yuvfile = "..\\..\\test.yuv";
-    ifstream infile;
-    infile.open(yuvfile.c_str(), ios::binary);
-    if (!infile.is_open()) {
-        printf("ERROR: failed to open input yuv file %s\n", yuvfile);
-        exit(1);
-    }
-    infile.read(buf, size);
-    infile.close();
 }
 
 void test_gpu_affine(size_t x, size_t y, size_t w, size_t h)
@@ -399,6 +538,21 @@ void test_gpu_affine(size_t x, size_t y, size_t w, size_t h)
     clReleaseMemObject(affine_dst);
 }
 
+void test_gpu_fft(int width, int height)
+{
+    VkFFTResult resFFT = VKFFT_SUCCESS;
+    VkGPU vkGPU = {};
+    vkGPU.platform = platform;
+    vkGPU.device = device;
+    vkGPU.context = context;
+    vkGPU.commandQueue = queue;
+    vkGPU.device_id = 0;
+
+    printf("gpu-fft: width = %d, height = %d\n", width, height);
+    resFFT = gpu_fft(&vkGPU, width, height);
+    printf("resFFT = % d\n", resFFT);
+}
+
 void parse_arg(int argc, char** argv)
 {
     roi.x = 6;
@@ -435,8 +589,9 @@ int main(int argc, char** argv)
     //test_gpu_cos2d(roi.width, roi.height);
     //test_gpu_gauss2d(roi.width, roi.height);
     //test_gpu_preproc(roi.width, roi.height);
+    //test_gpu_affine(roi.x, roi.y, roi.width, roi.height);
 
-    test_gpu_affine(roi.x, roi.y, roi.width, roi.height);
+    test_gpu_fft(roi.width, roi.height);
 
     ocl_destroy();
     
