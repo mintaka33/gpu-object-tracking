@@ -127,7 +127,7 @@ void init_srcbuf(char* buf, int size)
 cl_int dump_clbuf(cl_mem clbuffer, uint64_t bufferSize, int w, int h)
 {
     cl_int res;
-    vector<float> outdata(bufferSize, 0);
+    vector<double> outdata(bufferSize, 0);
     res = clEnqueueReadBuffer(queue, clbuffer, CL_TRUE, 0, bufferSize, outdata.data(), 0, NULL, NULL);
     CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
     clFinish(queue);
@@ -325,13 +325,14 @@ VkFFTResult gpu_fft(cl_mem clinbuffer, cl_mem clbuffer, int w, int h)
     configuration.size[0] = w;
     configuration.size[1] = h;
     configuration.numberBatches = 0;
+    configuration.doublePrecision = 1;
     //configuration.performR2C = 1; // perform R2C/C2R decomposition (0 - off, 1 - on)
     uint64_t num_items = configuration.size[0] * configuration.size[1];
 
     // out-of-place R2C FFT with custom strides
-    uint64_t inputBufferSize = sizeof(float) * 2 * num_items;
-    uint64_t outputBufferSize = sizeof(float) * 2 * num_items;
-    uint64_t bufferSize = sizeof(float) * 2 * num_items; // (configuration.size[0] / 2 + 1)* configuration.size[1];
+    uint64_t inputBufferSize = sizeof(double) * 2 * num_items;
+    uint64_t outputBufferSize = sizeof(double) * 2 * num_items;
+    uint64_t bufferSize = sizeof(double) * 2 * num_items; // (configuration.size[0] / 2 + 1)* configuration.size[1];
 
     configuration.isInputFormatted = 1;
     configuration.inputBufferStride[0] = configuration.size[0];
@@ -487,11 +488,11 @@ void test_gpu_fft(int width, int height)
     VkFFTResult resFFT = VKFFT_SUCCESS;
     cl_int res = CL_SUCCESS;
     uint64_t num_items = width * height;
-    uint64_t inputBufferSize = sizeof(float) * 2 * num_items;
-    uint64_t outputBufferSize = sizeof(float) * 2 * num_items;
-    uint64_t bufferSize = sizeof(float) * 2 * num_items; 
-    vector<float> indata(2 * num_items, 0);
-    vector<float> outdata(2 * num_items, 0);
+    uint64_t inputBufferSize = sizeof(double) * 2 * num_items;
+    uint64_t outputBufferSize = sizeof(double) * 2 * num_items;
+    uint64_t bufferSize = sizeof(double) * 2 * num_items; 
+    vector<double> indata(2 * num_items, 0);
+    vector<double> outdata(2 * num_items, 0);
     for (size_t i = 0; i < 2 * num_items; i += 2) {
         indata[i] = i;
     }
@@ -542,7 +543,7 @@ void track_init(const ROI& roi)
 
     gpu_gauss2d(w, h, guass2d);
 
-    uint64_t bufferSize = sizeof(float) * 2 * w * h;
+    uint64_t bufferSize = sizeof(double) * 2 * w * h;
     // computation buffer in device
     cl_mem clbuffer = clCreateBuffer(context, CL_MEM_READ_WRITE, bufferSize, 0, &res);
     CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
