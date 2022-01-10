@@ -124,24 +124,19 @@ void init_srcbuf(char* buf, int size)
     infile.close();
 }
 
-cl_int dump_clbuf(cl_mem clbuffer, uint64_t bufferSize, int w, int h)
+void dump_clbuf(char* tag, cl_mem clbuffer, uint64_t size, int w, int h, int i, bool istext)
 {
     cl_int res;
-    vector<double> outdata(bufferSize, 0);
-    res = clEnqueueReadBuffer(queue, clbuffer, CL_TRUE, 0, bufferSize, outdata.data(), 0, NULL, NULL);
+    vector<double> outdata(size, 0);
+    res = clEnqueueReadBuffer(queue, clbuffer, CL_TRUE, 0, size, outdata.data(), 0, NULL, NULL);
     CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
     clFinish(queue);
 
-    if (g_dump_result) {
-        ofstream outfile("result.txt");
-        for (size_t y = 0; y < h; y++) {
-            for (size_t x = 0; x < 2 * w; x++) {
-                outfile << outdata[y * 2 * w + x] / 2 << ", ";
-            }
-            outfile << "\n";
-        }
-    }    
-    return res;
+    if (istext) {
+        dump2text(tag, (double*)outdata.data(), w, h, i);
+    } else {
+        dump2yuv(tag, (uint8_t*)outdata.data(), w, h, i);
+    }
 }
 
 void gpu_hanning(size_t n, cl_mem &cos1d)
@@ -420,46 +415,41 @@ void test_gpu_preproc(size_t width, size_t height)
     clReleaseMemObject(data_log);
 }
 
-void test_gpu_affine(size_t x, size_t y, size_t w, size_t h)
+cl_mem get_roi(size_t w, size_t h, size_t x, size_t y)
 {
     size_t srcw = 1920, srch = 1080;
     vector<int8_t> inbuf(srcw * srch, 0);
-    init_srcbuf((char*)inbuf.data(), srcw * srch); 
+    init_srcbuf((char*)inbuf.data(), srcw * srch);
 
-    vector<int8_t> outgpu(w * h, 0);
+    // generate reference
+    //vector<int8_t> outref(w * h, 0);
+    //for (size_t j = 0; j < h; j++) {
+    //    for (size_t i = 0; i < w; i++) {
+    //        outref[j * w + i] = inbuf[(y + j) * srcw + (x + i)];
+    //    }
+    //}
+    //ofstream roifile;
+    //roifile.open("..\\..\\roi-ref.yuv", ios::binary);
+    //roifile.write((const char*)outref.data(), w * h);
+    //roifile.close();
+
     cl_mem crop_src = clCreateBuffer(context, CL_MEM_READ_ONLY, srcw * srch, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
     err = clEnqueueWriteBuffer(queue, crop_src, CL_TRUE, 0, srcw * srch, inbuf.data(), 0, NULL, NULL);
     CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
+
     cl_mem crop_dst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, w * h, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
 
     gpu_crop(crop_src, crop_dst, srcw, srch, x, y, w, h);
 
-    err = clEnqueueReadBuffer(queue, crop_dst, CL_TRUE, 0, w * h, outgpu.data(), 0, NULL, NULL);
-    CL_CHECK_ERROR(err, "clEnqueueReadBuffer");
+    clReleaseMemObject(crop_src);
 
-    // generate reference
-    vector<int8_t> outref(w*h, 0);
-    for (size_t j = 0; j < h; j++) {
-        for (size_t i = 0; i < w; i++) {
-            outref[j * w + i] = inbuf[(y+j)*srcw + (x+i)];
-        }
-    }
-    //ofstream roifile;
-    //roifile.open("..\\..\\roi.yuv", ios::binary);
-    //roifile.write((const char*)outref.data(), w * h);
-    //roifile.close();
+    return crop_dst;
+}
 
-    // compare gpu output and reference
-    int mismatch_count = 0;
-    for (size_t i = 0; i < w*h; i++) {
-        if (outgpu[i] != outref[i]) {
-            mismatch_count++;
-        }
-    }
-    printf("INFO: test_gpu_crop mismatch_count =%d\n", mismatch_count);
-
+cl_mem affine_roi(size_t w, size_t h, cl_mem crop_dst)
+{
     cl_mem affine_dst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, w * h, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
 
@@ -469,15 +459,20 @@ void test_gpu_affine(size_t x, size_t y, size_t w, size_t h)
 
     gpu_affine(crop_dst, affine_dst, w, h, m);
 
-    vector<int8_t> affout(w * h, 0);
-    err = clEnqueueReadBuffer(queue, affine_dst, CL_TRUE, 0, w * h, affout.data(), 0, NULL, NULL);
-    CL_CHECK_ERROR(err, "clEnqueueReadBuffer");
-    ofstream aff_file;
-    aff_file.open("..\\..\\aff.yuv", ios::binary);
-    aff_file.write((const char*)affout.data(), w * h);
-    aff_file.close();
+    return affine_dst;
+}
 
-    clReleaseMemObject(crop_src);
+void test_gpu_affine(size_t x, size_t y, size_t w, size_t h)
+{
+    cl_mem crop_dst;
+    cl_mem affine_dst;
+
+    crop_dst = get_roi(w, h, x, y);
+    dump_clbuf("gpu-roi", crop_dst, w*h, w, h, 0, false);
+
+    affine_dst = affine_roi(w, h, crop_dst);
+    dump_clbuf("gpu-affine", affine_dst, w * h, w, h, 0, false);
+
     clReleaseMemObject(crop_dst);
     clReleaseMemObject(affine_dst);
 }
@@ -551,7 +546,7 @@ void track_init(const ROI& roi)
     resFFT = gpu_fft(guass2d, clbuffer, w, h, false);
     printf("resFFT = % d\n", resFFT);
 
-    res = dump_clbuf(clbuffer, bufferSize, w, h);
+    dump_clbuf("gpu-fft", clbuffer, bufferSize, w, h, 0, true);
 
     clReleaseMemObject(guass2d);
 }
@@ -592,10 +587,10 @@ int main(int argc, char** argv)
     //test_gpu_cos2d(roi.width, roi.height);
     //test_gpu_gauss2d(roi.width, roi.height);
     //test_gpu_preproc(roi.width, roi.height);
-    //test_gpu_affine(roi.x, roi.y, roi.width, roi.height);
+    test_gpu_affine(roi.x, roi.y, roi.width, roi.height);
     //test_gpu_fft(roi.width, roi.height);
 
-    track_init(roi);
+    //track_init(roi);
 
     ocl_destroy();
     

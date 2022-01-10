@@ -10,11 +10,15 @@ def execute(cmd):
     print('#'*8, cmd)
     os.system(cmd)
 
-def verify_crop():
+def verify_affine():
     cmd = 'cd %s && %s' % (app_dir, app_name)
     execute(cmd)
-    frame = np.fromfile('aff.yuv', dtype=np.uint8, count=w*h).reshape((h, w))
-    cv2.imwrite('aff.bmp', frame)
+    roi_file = 'dump.gpu-roi.0000.517x421.yuv'
+    aff_file = 'dump.gpu-affine.0000.517x421.yuv'
+    frame = np.fromfile('%s\\%s'%(app_dir, roi_file), dtype=np.uint8, count=w*h).reshape((h, w))
+    cv2.imwrite('%s\\roi.bmp' % app_dir, frame)
+    frame = np.fromfile('%s\\%s'%(app_dir, aff_file), dtype=np.uint8, count=w*h).reshape((h, w))
+    cv2.imwrite('%s\\aff.bmp' % app_dir, frame)
 
 def verify_fft():
     def dump_result(data, tag):
@@ -46,7 +50,7 @@ def verify_fft():
     dump_result(gpu, 'gpu')
     print('INFO: [%dx%d] sum of delta = %f, max = %f' % (w, h, np.sum(np.abs(ref - gpu)), np.max(np.abs(ref - gpu))))
 
-# verify_crop()
-verify_fft()
+verify_affine()
+# verify_fft()
 
 print('done')
