@@ -316,7 +316,7 @@ void gpu_affine(cl_mem clsrc, cl_mem cldst, int w, int h, double m[2][3])
     clReleaseKernel(kernel);
 }
 
-VkFFTResult gpu_fft(cl_mem clinbuffer, cl_mem clbuffer, int w, int h)
+VkFFTResult gpu_fft(cl_mem clinbuffer, cl_mem clbuffer, int w, int h, bool r2c)
 {
     //zero-initialize configuration + FFT application
     VkFFTConfiguration configuration = {};
@@ -326,12 +326,11 @@ VkFFTResult gpu_fft(cl_mem clinbuffer, cl_mem clbuffer, int w, int h)
     configuration.size[1] = h;
     configuration.numberBatches = 0;
     configuration.doublePrecision = 1;
-    //configuration.performR2C = 1; // perform R2C/C2R decomposition (0 - off, 1 - on)
+    configuration.performR2C = (r2c)? 1 : 0; // perform R2C/C2R decomposition (0 - off, 1 - on)
     uint64_t num_items = configuration.size[0] * configuration.size[1];
 
     // out-of-place R2C FFT with custom strides
-    uint64_t inputBufferSize = sizeof(double) * 2 * num_items;
-    uint64_t outputBufferSize = sizeof(double) * 2 * num_items;
+    uint64_t inputBufferSize = (r2c) ? sizeof(double) * 2 * num_items : sizeof(double) * num_items;
     uint64_t bufferSize = sizeof(double) * 2 * num_items; // (configuration.size[0] / 2 + 1)* configuration.size[1];
 
     configuration.isInputFormatted = 1;
@@ -510,7 +509,7 @@ void test_gpu_fft(int width, int height)
 
     // execute GPU FFT
     printf("gpu-fft: width = %d, height = %d\n", width, height);
-    resFFT = gpu_fft(clinbuffer, clbuffer, width, height);
+    resFFT = gpu_fft(clinbuffer, clbuffer, width, height, true);
     printf("resFFT = % d\n", resFFT);
 
     res = clEnqueueReadBuffer(queue, clbuffer, CL_TRUE, 0, bufferSize, outdata.data(), 0, NULL, NULL);
@@ -549,7 +548,7 @@ void track_init(const ROI& roi)
     CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
 
     // execute GPU FFT
-    resFFT = gpu_fft(guass2d, clbuffer, w, h);
+    resFFT = gpu_fft(guass2d, clbuffer, w, h, false);
     printf("resFFT = % d\n", resFFT);
 
     res = dump_clbuf(clbuffer, bufferSize, w, h);
