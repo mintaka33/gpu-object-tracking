@@ -197,6 +197,9 @@ void gpu_cos2d(size_t width, size_t height, cl_mem& cosw, cl_mem& cosh, cl_mem& 
 
 void gpu_gauss2d(size_t width, size_t height, cl_mem& guass2d)
 {
+    guass2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+
     cl_kernel kernel = clCreateKernel(program, "gauss2d", &err);
     CL_CHECK_ERROR(err, "clCreateKernel");
 
@@ -213,12 +216,6 @@ void gpu_gauss2d(size_t width, size_t height, cl_mem& guass2d)
     err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, work_size, NULL, 0, NULL, &profile_event);
     CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
     print_perf();
-
-    vector<double> host_guass2d(width * height);
-    err = clEnqueueReadBuffer(queue, guass2d, CL_TRUE, 0, sizeof(double) * width * height, host_guass2d.data(), 0, NULL, NULL);
-    CL_CHECK_ERROR(err, "clEnqueueReadBuffer");
-
-    dump2text("guass2d-gpu", host_guass2d.data(), width, height);
 
     clReleaseKernel(kernel);
 }
@@ -311,8 +308,9 @@ void gpu_affine(cl_mem clsrc, cl_mem cldst, int w, int h, double m[2][3])
     clReleaseKernel(kernel);
 }
 
-VkFFTResult gpu_fft(cl_mem clinbuffer, cl_mem clbuffer, int w, int h, bool r2c)
+VkFFTResult gpu_fft(cl_mem clinbuffer, cl_mem& clbuffer, int w, int h, bool r2c)
 {
+    cl_int res = CL_SUCCESS;
     //zero-initialize configuration + FFT application
     VkFFTConfiguration configuration = {};
     VkFFTApplication app = {};
@@ -337,6 +335,10 @@ VkFFTResult gpu_fft(cl_mem clinbuffer, cl_mem clbuffer, int w, int h, bool r2c)
     configuration.device = &device;
     configuration.platform = &platform;
     configuration.context = &context;
+
+    // computation buffer in device
+    clbuffer = clCreateBuffer(context, CL_MEM_READ_WRITE, bufferSize, 0, &res);
+    CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
 
     configuration.inputBuffer = &clinbuffer;
     configuration.inputBufferSize = &inputBufferSize;
@@ -389,11 +391,14 @@ void test_gpu_cos2d(size_t width, size_t height)
     clReleaseMemObject(cos2d);
 }
 
-void test_gpu_gauss2d(size_t width, size_t height)
+void test_gpu_gauss2d(size_t w, size_t h)
 {
-    cl_mem guass2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-    gpu_gauss2d(width, height, guass2d);
+    cl_mem guass2d;
+
+    gpu_gauss2d(w, h, guass2d);
+
+    dump_clbuf("gpu-guass2d", guass2d, sizeof(double)*w*h, w, h, 0, true);
+
     clReleaseMemObject(guass2d);
 }
 
@@ -415,42 +420,29 @@ void test_gpu_preproc(size_t width, size_t height)
     clReleaseMemObject(data_log);
 }
 
-cl_mem get_roi(size_t w, size_t h, size_t x, size_t y)
+void crop_roi(size_t w, size_t h, size_t x, size_t y, cl_mem& crop_dst)
 {
     size_t srcw = 1920, srch = 1080;
     vector<int8_t> inbuf(srcw * srch, 0);
     init_srcbuf((char*)inbuf.data(), srcw * srch);
-
-    // generate reference
-    //vector<int8_t> outref(w * h, 0);
-    //for (size_t j = 0; j < h; j++) {
-    //    for (size_t i = 0; i < w; i++) {
-    //        outref[j * w + i] = inbuf[(y + j) * srcw + (x + i)];
-    //    }
-    //}
-    //ofstream roifile;
-    //roifile.open("..\\..\\roi-ref.yuv", ios::binary);
-    //roifile.write((const char*)outref.data(), w * h);
-    //roifile.close();
+    //dump2yuv("srcyuv", (uint8_t *)inbuf.data(), w, h, 0);
 
     cl_mem crop_src = clCreateBuffer(context, CL_MEM_READ_ONLY, srcw * srch, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
     err = clEnqueueWriteBuffer(queue, crop_src, CL_TRUE, 0, srcw * srch, inbuf.data(), 0, NULL, NULL);
     CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
 
-    cl_mem crop_dst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, w * h, nullptr, &err);
+    crop_dst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, w * h, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
 
     gpu_crop(crop_src, crop_dst, srcw, srch, x, y, w, h);
 
     clReleaseMemObject(crop_src);
-
-    return crop_dst;
 }
 
-cl_mem affine_roi(size_t w, size_t h, cl_mem crop_dst)
+void affine_roi(size_t w, size_t h, cl_mem crop_dst, cl_mem& affine_dst)
 {
-    cl_mem affine_dst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, w * h, nullptr, &err);
+    affine_dst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, w * h, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
 
     double m[2][3] = {};
@@ -458,8 +450,6 @@ cl_mem affine_roi(size_t w, size_t h, cl_mem crop_dst)
     printf("host matrix = \n %f, %f, %f \n %f, %f, %f \n", m[0][0], m[0][1], m[0][2], m[1][0], m[1][1], m[1][2]);
 
     gpu_affine(crop_dst, affine_dst, w, h, m);
-
-    return affine_dst;
 }
 
 void test_gpu_affine(size_t x, size_t y, size_t w, size_t h)
@@ -467,21 +457,21 @@ void test_gpu_affine(size_t x, size_t y, size_t w, size_t h)
     cl_mem crop_dst;
     cl_mem affine_dst;
 
-    crop_dst = get_roi(w, h, x, y);
+    crop_roi(w, h, x, y, crop_dst);
     dump_clbuf("gpu-roi", crop_dst, w*h, w, h, 0, false);
 
-    affine_dst = affine_roi(w, h, crop_dst);
+    affine_roi(w, h, crop_dst, affine_dst);
     dump_clbuf("gpu-affine", affine_dst, w * h, w, h, 0, false);
 
     clReleaseMemObject(crop_dst);
     clReleaseMemObject(affine_dst);
 }
 
-void test_gpu_fft(int width, int height)
+void test_gpu_fft(int w, int h)
 {
     VkFFTResult resFFT = VKFFT_SUCCESS;
     cl_int res = CL_SUCCESS;
-    uint64_t num_items = width * height;
+    uint64_t num_items = w * h;
     uint64_t inputBufferSize = sizeof(double) * 2 * num_items;
     uint64_t outputBufferSize = sizeof(double) * 2 * num_items;
     uint64_t bufferSize = sizeof(double) * 2 * num_items; 
@@ -503,23 +493,10 @@ void test_gpu_fft(int width, int height)
     CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
 
     // execute GPU FFT
-    printf("gpu-fft: width = %d, height = %d\n", width, height);
-    resFFT = gpu_fft(clinbuffer, clbuffer, width, height, true);
+    printf("gpu-fft: width = %d, height = %d\n", w, h);
+    resFFT = gpu_fft(clinbuffer, clbuffer, w, h, true);
     printf("resFFT = % d\n", resFFT);
-
-    res = clEnqueueReadBuffer(queue, clbuffer, CL_TRUE, 0, bufferSize, outdata.data(), 0, NULL, NULL);
-    CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
-    clFinish(queue);
-
-    if (g_dump_result) {
-        ofstream outfile("result.txt");
-        for (size_t y = 0; y < height; y++) {
-            for (size_t x = 0; x < 2 * width; x++) {
-                outfile << outdata[y * 2 * width + x] / 2 << ", ";
-            }
-            outfile << "\n";
-        }
-    }
+    dump_clbuf("gpu-fft", clbuffer, bufferSize, w, h, 0, true);
 
     clReleaseMemObject(clbuffer);
     clReleaseMemObject(clinbuffer);
@@ -531,24 +508,33 @@ void track_init(const ROI& roi)
     cl_int res = CL_SUCCESS;
     int w = roi.width;
     int h = roi.height;
+    int x = roi.x;
+    int y = roi.y;
+    cl_mem guass2d;
+    cl_mem clbuffer;
+    cl_mem crop_dst;
+    cl_mem affine_dst;
 
-    cl_mem guass2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * w * h, nullptr, &err);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-
-    gpu_gauss2d(w, h, guass2d);
-
-    uint64_t bufferSize = sizeof(double) * 2 * w * h;
-    // computation buffer in device
-    cl_mem clbuffer = clCreateBuffer(context, CL_MEM_READ_WRITE, bufferSize, 0, &res);
-    CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
+    // generate gauss distribution
+     gpu_gauss2d(w, h, guass2d);
 
     // execute GPU FFT
     resFFT = gpu_fft(guass2d, clbuffer, w, h, false);
-    printf("resFFT = % d\n", resFFT);
+    printf("INFO: gpu_fft return = %d\n", resFFT);
+    dump_clbuf("gpu-fft", clbuffer, 2 * w * h, 2*w, h, 0, true);
 
-    dump_clbuf("gpu-fft", clbuffer, bufferSize, w, h, 0, true);
+    // crop the ROI region from source frame
+    crop_roi(w, h, x, y, crop_dst);
+    dump_clbuf("gpu-roi", crop_dst, w * h, w, h, 0, false);
 
+    // do affine transformation for the ROI region
+    affine_roi(w, h, crop_dst, affine_dst);
+    dump_clbuf("gpu-affine", affine_dst, w * h, w, h, 0, false);
+
+    clReleaseMemObject(crop_dst);
+    clReleaseMemObject(affine_dst);
     clReleaseMemObject(guass2d);
+    clReleaseMemObject(clbuffer);
 }
 
 void parse_arg(int argc, char** argv)
@@ -587,10 +573,10 @@ int main(int argc, char** argv)
     //test_gpu_cos2d(roi.width, roi.height);
     //test_gpu_gauss2d(roi.width, roi.height);
     //test_gpu_preproc(roi.width, roi.height);
-    test_gpu_affine(roi.x, roi.y, roi.width, roi.height);
+    //test_gpu_affine(roi.x, roi.y, roi.width, roi.height);
     //test_gpu_fft(roi.width, roi.height);
 
-    //track_init(roi);
+    track_init(roi);
 
     ocl_destroy();
     
