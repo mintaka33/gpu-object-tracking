@@ -3,8 +3,10 @@ import numpy as np
 import cv2
 
 w, h = 517, 421
-app_dir = 'D:\\Code\\gpu_tracking\\gpu-object-tracking\\build\\bin'
 app_name = 'gpu_math.exe'
+app_dir = 'D:\\Code\\gpu_tracking\\gpu-object-tracking\\build\\bin'
+roi_file = 'dump.gpu-roi.0000.517x421.yuv'
+aff_file = 'dump.gpu-affine.0000.517x421.yuv'
 
 def execute(cmd):
     print('#'*8, cmd)
@@ -13,8 +15,7 @@ def execute(cmd):
 def verify_affine():
     cmd = 'cd %s && %s' % (app_dir, app_name)
     execute(cmd)
-    roi_file = 'dump.gpu-roi.0000.517x421.yuv'
-    aff_file = 'dump.gpu-affine.0000.517x421.yuv'
+
     frame = np.fromfile('%s\\%s'%(app_dir, roi_file), dtype=np.uint8, count=w*h).reshape((h, w))
     cv2.imwrite('%s\\roi.bmp' % app_dir, frame)
     frame = np.fromfile('%s\\%s'%(app_dir, aff_file), dtype=np.uint8, count=w*h).reshape((h, w))
@@ -50,7 +51,14 @@ def verify_fft():
     dump_result(gpu, 'gpu')
     print('INFO: [%dx%d] sum of delta = %f, max = %f' % (w, h, np.sum(np.abs(ref - gpu)), np.max(np.abs(ref - gpu))))
 
-verify_affine()
+def verify_preproc():
+    aff = np.fromfile('%s\\%s' % (app_dir, aff_file), dtype=np.uint8).reshape((h, w))
+    print('affine sum = %d, average = %f' % (np.sum(aff), np.average(aff)))
+    pass
+
+# verify_affine()
 # verify_fft()
+
+verify_preproc()
 
 print('done')

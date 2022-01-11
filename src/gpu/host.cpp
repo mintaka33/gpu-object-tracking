@@ -502,6 +502,43 @@ void test_gpu_fft(int w, int h)
     clReleaseMemObject(clinbuffer);
 }
 
+void preproc(cl_mem clsrc, cl_mem& cldst, int w, int h)
+{
+    cl_int res;
+    cldst = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(double) * w * h, 0, &res);
+    CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
+
+    cl_mem clsum = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(int), 0, &res);
+    CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
+
+    cl_kernel kernel = clCreateKernel(program, "preproc", &err);
+    CL_CHECK_ERROR(err, "clCreateKernel");
+
+    err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &clsrc);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel, 1, sizeof(cl_mem), &cldst);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel, 2, sizeof(int), (int*)&w);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel, 3, sizeof(int), (int*)&h);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel, 4, sizeof(cl_mem), &clsum);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+
+    size_t work_size[2] = { w, h };
+    err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, work_size, NULL, 0, NULL, &profile_event);
+    CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
+    print_perf();
+
+    uint32_t sum_result = 0;
+    err = clEnqueueReadBuffer(queue, clsum, CL_TRUE, 0, sizeof(int), &sum_result, 0, NULL, NULL);
+    CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
+    printf("INFO: sum_result = %d\n", sum_result);
+
+    clReleaseMemObject(clsum);
+    clReleaseKernel(kernel);
+}
+
 void track_init(const ROI& roi)
 {
     VkFFTResult resFFT = VKFFT_SUCCESS;
@@ -514,9 +551,10 @@ void track_init(const ROI& roi)
     cl_mem clbuffer;
     cl_mem crop_dst;
     cl_mem affine_dst;
+    cl_mem proc_dst;
 
     // generate gauss distribution
-     gpu_gauss2d(w, h, guass2d);
+    gpu_gauss2d(w, h, guass2d);
 
     // execute GPU FFT
     resFFT = gpu_fft(guass2d, clbuffer, w, h, false);
@@ -531,10 +569,13 @@ void track_init(const ROI& roi)
     affine_roi(w, h, crop_dst, affine_dst);
     dump_clbuf("gpu-affine", affine_dst, w * h, w, h, 0, false);
 
+    preproc(affine_dst, proc_dst, w, h);
+
     clReleaseMemObject(crop_dst);
     clReleaseMemObject(affine_dst);
     clReleaseMemObject(guass2d);
     clReleaseMemObject(clbuffer);
+    clReleaseMemObject(proc_dst);
 }
 
 void parse_arg(int argc, char** argv)

@@ -2,7 +2,7 @@
 #define PI 3.1415926
 #define SIGMA 2.0
 
-#define KERNEL_LOG 0
+#define KERNEL_LOG 1
 
 __kernel void hanning(__global double* out, int m) 
 {
@@ -136,3 +136,31 @@ __kernel void affine(__global uchar* src, __global uchar* dst, __global double* 
 
     dst[(j * w + i)] = p;
 }
+
+__kernel void preproc(__global uchar* src, __global double* dst, int w,  int h, __global int* sum)
+{
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int size_x = get_global_size(0);
+    int size_y = get_global_size(1);
+
+#if KERNEL_LOG
+    if (x == 0 && y == 0) {
+        printf("kernel_log:preproc: size_x = %d, size_y = %d, w = %d, h = %d\n", size_x, size_y, w, h);
+        //sum[0] = 100;
+    }
+#endif
+
+    atomic_add(sum, src[y*w+x]);
+
+    //barrier(CLK_GLOBAL_MEM_FENCE);
+
+    if (x == 0 && y == 0) {
+        printf("kernel_log:preproc: sum = %d\n", sum[0]);
+        //sum[0] = sum[0]/(w*h);
+    }
+
+    dst[y*w+x] = src[y*w+x];
+}
+
+
