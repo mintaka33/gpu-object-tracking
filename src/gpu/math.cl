@@ -137,6 +137,28 @@ __kernel void affine(__global uchar* src, __global uchar* dst, __global double* 
     dst[(j * w + i)] = p;
 }
 
+static float atomic_cmpxchg_f32(volatile __global float *p, float cmp, float val) {
+    union {
+        unsigned int u32;
+        float        f32;
+    } cmp_union, val_union, old_union;
+
+    cmp_union.f32 = cmp;
+    val_union.f32 = val;
+    old_union.u32 = atomic_cmpxchg((volatile __global unsigned int *) p, cmp_union.u32, val_union.u32);
+    return old_union.f32;
+}
+
+static float atomic_add_f32(volatile __global float *p, float val) {
+    float found = *p;
+    float expected;
+    do {
+        expected = found;
+        found = atomic_cmpxchg_f32(p, expected, expected + val);
+    } while (found != expected);
+    return found;
+}
+
 __kernel void preproc(__global uchar* src, __global double* dst, int w,  int h, __global int* sum)
 {
     int x = get_global_id(0);
@@ -147,20 +169,15 @@ __kernel void preproc(__global uchar* src, __global double* dst, int w,  int h, 
 #if KERNEL_LOG
     if (x == 0 && y == 0) {
         printf("kernel_log:preproc: size_x = %d, size_y = %d, w = %d, h = %d\n", size_x, size_y, w, h);
-        //sum[0] = 100;
     }
 #endif
 
-    atomic_add(sum, src[y*w+x]);
+    // the mimic atomic float is too costly to use
+    // atomic_add_f32(sum, log((float)(src[y*w+x])));
 
-    //barrier(CLK_GLOBAL_MEM_FENCE);
-
-    if (x == 0 && y == 0) {
-        printf("kernel_log:preproc: sum = %d\n", sum[0]);
-        //sum[0] = sum[0]/(w*h);
-    }
-
-    dst[y*w+x] = src[y*w+x];
+    // use build-in atomic_add int, there might be loss due to rounding float to int
+    float a = log((float)src[y*w+x]);
+    atomic_add(sum, (int)round(a));
 }
 
 

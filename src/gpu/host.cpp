@@ -530,10 +530,10 @@ void preproc(cl_mem clsrc, cl_mem& cldst, int w, int h)
     CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
     print_perf();
 
-    uint32_t sum_result = 0;
+    int sum_result = 0;
     err = clEnqueueReadBuffer(queue, clsum, CL_TRUE, 0, sizeof(int), &sum_result, 0, NULL, NULL);
     CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
-    printf("INFO: sum_result = %d\n", sum_result);
+    printf("INFO: sum_result = %d, average_result = %f\n", sum_result, ((float)sum_result)/(w*h));
 
     clReleaseMemObject(clsum);
     clReleaseKernel(kernel);
@@ -557,9 +557,11 @@ void track_init(const ROI& roi)
     gpu_gauss2d(w, h, guass2d);
 
     // execute GPU FFT
+#if 0
     resFFT = gpu_fft(guass2d, clbuffer, w, h, false);
     printf("INFO: gpu_fft return = %d\n", resFFT);
     dump_clbuf("gpu-fft", clbuffer, 2 * w * h, 2*w, h, 0, true);
+#endif
 
     // crop the ROI region from source frame
     crop_roi(w, h, x, y, crop_dst);
@@ -574,7 +576,7 @@ void track_init(const ROI& roi)
     clReleaseMemObject(crop_dst);
     clReleaseMemObject(affine_dst);
     clReleaseMemObject(guass2d);
-    clReleaseMemObject(clbuffer);
+    //clReleaseMemObject(clbuffer);
     clReleaseMemObject(proc_dst);
 }
 

@@ -52,8 +52,12 @@ def verify_fft():
     print('INFO: [%dx%d] sum of delta = %f, max = %f' % (w, h, np.sum(np.abs(ref - gpu)), np.max(np.abs(ref - gpu))))
 
 def verify_preproc():
+    cmd = 'cd %s && %s' % (app_dir, app_name)
+    execute(cmd)
     aff = np.fromfile('%s\\%s' % (app_dir, aff_file), dtype=np.uint8).reshape((h, w))
-    print('affine sum = %d, average = %f' % (np.sum(aff), np.average(aff)))
+    aff = np.log(aff.astype(np.float))
+    aff = np.round(aff).astype(np.int) # round float to int to match with kernel implementation
+    print('affine sum = %f, average = %f' % (np.sum(aff), np.average(aff)))
     pass
 
 # verify_affine()
