@@ -508,25 +508,24 @@ void preproc(cl_mem clsrc, cl_mem& cldst, int w, int h)
     cldst = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(double) * w * h, 0, &res);
     CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
 
+    // Calculate sum of log(src array)
     cl_mem clsum = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(int), 0, &res);
     CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
 
-    cl_kernel kernel = clCreateKernel(program, "preproc", &err);
+    cl_kernel kernel_sum = clCreateKernel(program, "preproc_sum", &err);
     CL_CHECK_ERROR(err, "clCreateKernel");
 
-    err = clSetKernelArg(kernel, 0, sizeof(cl_mem), &clsrc);
+    err = clSetKernelArg(kernel_sum, 0, sizeof(cl_mem), &clsrc);
     CL_CHECK_ERROR(err, "clSetKernelArg");
-    err = clSetKernelArg(kernel, 1, sizeof(cl_mem), &cldst);
+    err = clSetKernelArg(kernel_sum, 1, sizeof(int), (int*)&w);
     CL_CHECK_ERROR(err, "clSetKernelArg");
-    err = clSetKernelArg(kernel, 2, sizeof(int), (int*)&w);
+    err = clSetKernelArg(kernel_sum, 2, sizeof(int), (int*)&h);
     CL_CHECK_ERROR(err, "clSetKernelArg");
-    err = clSetKernelArg(kernel, 3, sizeof(int), (int*)&h);
-    CL_CHECK_ERROR(err, "clSetKernelArg");
-    err = clSetKernelArg(kernel, 4, sizeof(cl_mem), &clsum);
+    err = clSetKernelArg(kernel_sum, 3, sizeof(cl_mem), &clsum);
     CL_CHECK_ERROR(err, "clSetKernelArg");
 
     size_t work_size[2] = { w, h };
-    err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, work_size, NULL, 0, NULL, &profile_event);
+    err = clEnqueueNDRangeKernel(queue, kernel_sum, 2, NULL, work_size, NULL, 0, NULL, &profile_event);
     CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
     print_perf();
 
@@ -535,8 +534,37 @@ void preproc(cl_mem clsrc, cl_mem& cldst, int w, int h)
     CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
     printf("INFO: sum_result = %d, average_result = %f\n", sum_result, ((float)sum_result)/(w*h));
 
+    // Calculate standard deviation of log(src array)
+    cl_mem clstd = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(int), 0, &res);
+    CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
+
+    cl_kernel kernel_std = clCreateKernel(program, "preproc_std", &err);
+    CL_CHECK_ERROR(err, "clCreateKernel");
+
+    err = clSetKernelArg(kernel_std, 0, sizeof(cl_mem), &clsrc);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel_std, 1, sizeof(cl_mem), &clsum);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel_std, 2, sizeof(int), (int*)&w);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel_std, 3, sizeof(int), (int*)&h);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel_std, 4, sizeof(cl_mem), &clstd);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+
+    err = clEnqueueNDRangeKernel(queue, kernel_std, 2, NULL, work_size, NULL, 0, NULL, &profile_event);
+    CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
+    print_perf();
+
+    int std_result = 0;
+    err = clEnqueueReadBuffer(queue, clstd, CL_TRUE, 0, sizeof(int), &std_result, 0, NULL, NULL);
+    CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
+    printf("INFO: std_sum = %d, std_result = %f\n", std_result, sqrt(((float)std_result) / (w * h)));
+
     clReleaseMemObject(clsum);
-    clReleaseKernel(kernel);
+    clReleaseMemObject(clstd);
+    clReleaseKernel(kernel_sum);
+    clReleaseKernel(kernel_std);
 }
 
 void track_init(const ROI& roi)
