@@ -55,13 +55,8 @@ def verify_preproc():
     cmd = 'cd %s && %s' % (app_dir, app_name)
     execute(cmd)
     aff = np.fromfile('%s\\%s' % (app_dir, aff_file), dtype=np.uint8).reshape((h, w))
-    aff2 = np.log(aff.astype(np.float))
-    aff3 = np.round(aff2).astype(np.int) # round float to int to match with kernel implementation
-    print('affine sum = %f, average = %f' % (np.sum(aff3), np.average(aff3)))
-    avg = np.average(aff3)
-    aff4 = (aff2 - avg) * (aff2 - avg)
-    aff4 = np.round(aff4).astype(np.int)
-    print('affine std_sum = %f, std = %f' % (np.sum(aff4), np.sqrt(np.sum(aff4)/(w*h))))
+    aff2 = np.log(aff.astype(np.float)).astype(np.float)
+    print('affine avg = %f, std = %f' % (np.average(aff2), np.std(aff2)))
     pass
 
 # verify_affine()

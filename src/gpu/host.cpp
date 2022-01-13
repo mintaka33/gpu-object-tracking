@@ -12,6 +12,7 @@
 
 #include "../util.h"
 #include "../math.h"
+#include "../perf.h"
 
 #define VKFFT_BACKEND 3
 #include "vkFFT.h"
@@ -505,9 +506,38 @@ void test_gpu_fft(int w, int h)
 void preproc(cl_mem clsrc, cl_mem& cldst, int w, int h)
 {
     cl_int res;
-    cldst = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(double) * w * h, 0, &res);
+    cldst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * w * h, 0, &res);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+
+    vector<uint8_t> src(w*h, 0);
+    err = clEnqueueReadBuffer(queue, clsrc, CL_TRUE, 0, sizeof(uint8_t)*w*h, src.data(), 0, NULL, NULL);
     CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
 
+    PFU_ENTER;
+    float avg = 0, std = 0;
+    vector<float> dst(w * h, 0);
+    for (size_t y = 0; y < h; y++) {
+        for (size_t x = 0; x < w; x++) {
+            dst[y * w + x] = log(float(src[y * w + x]));
+        }
+    }
+    for (size_t y = 0; y < h; y++) {
+        for (size_t x = 0; x < w; x++) {
+            avg += dst[y * w + x];
+        }
+    }
+    avg = avg / (w * h);
+
+    for (size_t y = 0; y < h; y++) {
+        for (size_t x = 0; x < w; x++) {
+            std += (dst[y * w + x] - avg) * (dst[y * w + x] - avg);
+        }
+    }
+    std = sqrt(std / (w * h));
+    PFU_LEAVE;
+    printf("Host preproc: avg = %f, std = %f\n", avg, std);
+
+#if 0
     // Calculate sum of log(src array)
     cl_mem clsum = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(int), 0, &res);
     CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
@@ -565,6 +595,7 @@ void preproc(cl_mem clsrc, cl_mem& cldst, int w, int h)
     clReleaseMemObject(clstd);
     clReleaseKernel(kernel_sum);
     clReleaseKernel(kernel_std);
+#endif
 }
 
 void track_init(const ROI& roi)
