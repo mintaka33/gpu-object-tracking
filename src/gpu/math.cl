@@ -207,3 +207,21 @@ __kernel void preproc_std(__global uchar *src, __global int *log_sum, int w,
   float b = (a - avg) * (a - avg);
   atomic_add(std_sum, (int)round(b));
 }
+
+__kernel void preproc(__global uchar *src, __global double *cos2d, __global double *dst, float avg, float std, int w, int h)
+{
+  int x = get_global_id(0);
+  int y = get_global_id(1);
+  int size_x = get_global_size(0);
+  int size_y = get_global_size(1);
+
+#if KERNEL_LOG
+  if (x == 0 && y == 0) {
+    printf("kernel_log:preproc_std: size_x = %d, size_y = %d, w = %d, h = %d\n", size_x, size_y, w, h);
+  }
+#endif
+
+  double eps = 0.00001;
+  double a = log((float)src[y * w + x]);
+  dst[y * w + x] = ((a - avg) / (std + eps)) * cos2d[y * w + x];
+}

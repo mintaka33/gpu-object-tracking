@@ -5,8 +5,9 @@ import cv2
 w, h = 517, 421
 app_name = 'gpu_math.exe'
 app_dir = 'D:\\Code\\gpu_tracking\\gpu-object-tracking\\build\\bin'
-roi_file = 'dump.gpu-roi.0000.517x421.yuv'
-aff_file = 'dump.gpu-affine.0000.517x421.yuv'
+roi_file = '%s\\dump.gpu-roi.0000.517x421.yuv'%app_dir
+aff_file = '%s\\dump.gpu-affine.0000.517x421.yuv'%app_dir
+proc_file = '%s\\dump.0000.gpu-preproc.517x421.txt'%app_dir
 
 def execute(cmd):
     print('#'*8, cmd)
@@ -16,9 +17,9 @@ def verify_affine():
     cmd = 'cd %s && %s' % (app_dir, app_name)
     execute(cmd)
 
-    frame = np.fromfile('%s\\%s'%(app_dir, roi_file), dtype=np.uint8, count=w*h).reshape((h, w))
+    frame = np.fromfile(roi_file, dtype=np.uint8, count=w*h).reshape((h, w))
     cv2.imwrite('%s\\roi.bmp' % app_dir, frame)
-    frame = np.fromfile('%s\\%s'%(app_dir, aff_file), dtype=np.uint8, count=w*h).reshape((h, w))
+    frame = np.fromfile(aff_file, dtype=np.uint8, count=w*h).reshape((h, w))
     cv2.imwrite('%s\\aff.bmp' % app_dir, frame)
 
 def verify_fft():
@@ -54,10 +55,14 @@ def verify_fft():
 def verify_preproc():
     cmd = 'cd %s && %s' % (app_dir, app_name)
     execute(cmd)
-    aff = np.fromfile('%s\\%s' % (app_dir, aff_file), dtype=np.uint8).reshape((h, w))
-    aff2 = np.log(aff.astype(np.float)).astype(np.float)
-    print('affine avg = %f, std = %f' % (np.average(aff2), np.std(aff2)))
-    pass
+    gpu = np.genfromtxt(proc_file, dtype=float, delimiter=',')
+    gpu = gpu[:, :-1]
+    aff = np.fromfile(aff_file, dtype=np.uint8).reshape((h, w))
+    cos2d = cv2.createHanningWindow((w, h), cv2.CV_32F)
+    ref = np.log(np.float32(aff) + 1.0)
+    ref = (ref - ref.mean()) / (ref.std() + 1e-5)
+    ref = ref * cos2d
+    print('diff = %f' % np.sum(np.abs(ref -gpu)))
 
 # verify_affine()
 # verify_fft()

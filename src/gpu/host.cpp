@@ -162,8 +162,20 @@ void gpu_hanning(size_t n, cl_mem &cos1d)
     clReleaseKernel(kernel);
 }
 
-void gpu_cos2d(size_t width, size_t height, cl_mem& cosw, cl_mem& cosh, cl_mem& cos2d)
+void gpu_cos2d(size_t width, size_t height, cl_mem& cos2d)
 {
+    cos2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+
+    cl_mem cosw = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+    gpu_hanning(width, cosw);
+
+    cl_mem cosh = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * height, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+    gpu_hanning(height, cosh);
+
+
     cl_kernel kernel = clCreateKernel(program, "cosine2d", &err);
     CL_CHECK_ERROR(err, "clCreateKernel");
 
@@ -194,6 +206,8 @@ void gpu_cos2d(size_t width, size_t height, cl_mem& cosw, cl_mem& cosh, cl_mem& 
     dump2text("cos2d-gpu", host_cos2d.data(), width, height);
 
     clReleaseKernel(kernel);
+    clReleaseMemObject(cosw);
+    clReleaseMemObject(cosh);
 }
 
 void gpu_gauss2d(size_t width, size_t height, cl_mem& guass2d)
@@ -375,20 +389,8 @@ VkFFTResult gpu_fft(cl_mem clinbuffer, cl_mem& clbuffer, int w, int h, bool r2c)
 
 void test_gpu_cos2d(size_t width, size_t height)
 {
-    cl_mem cosw = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width, nullptr, &err);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-    gpu_hanning(width, cosw);
-
-    cl_mem cosh = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * height, nullptr, &err);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-    gpu_hanning(height, cosh);
-
-    cl_mem cos2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-    gpu_cos2d(width, height, cosw, cosh, cos2d);
-
-    clReleaseMemObject(cosw);
-    clReleaseMemObject(cosh);
+    cl_mem cos2d = 0;
+    gpu_cos2d(width, height, cos2d);
     clReleaseMemObject(cos2d);
 }
 
@@ -503,7 +505,7 @@ void test_gpu_fft(int w, int h)
     clReleaseMemObject(clinbuffer);
 }
 
-void preproc(cl_mem clsrc, cl_mem& cldst, int w, int h)
+void preproc(cl_mem clsrc, cl_mem cos2d, cl_mem& cldst, int w, int h)
 {
     cl_int res;
     cldst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * w * h, 0, &res);
@@ -537,65 +539,34 @@ void preproc(cl_mem clsrc, cl_mem& cldst, int w, int h)
     PFU_LEAVE;
     printf("Host preproc: avg = %f, std = %f\n", avg, std);
 
-#if 0
-    // Calculate sum of log(src array)
-    cl_mem clsum = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(int), 0, &res);
-    CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
-
-    cl_kernel kernel_sum = clCreateKernel(program, "preproc_sum", &err);
+    cl_kernel kernel_preproc = clCreateKernel(program, "preproc", &err);
     CL_CHECK_ERROR(err, "clCreateKernel");
 
-    err = clSetKernelArg(kernel_sum, 0, sizeof(cl_mem), &clsrc);
+    err = clSetKernelArg(kernel_preproc, 0, sizeof(cl_mem), &clsrc);
     CL_CHECK_ERROR(err, "clSetKernelArg");
-    err = clSetKernelArg(kernel_sum, 1, sizeof(int), (int*)&w);
+    err = clSetKernelArg(kernel_preproc, 1, sizeof(cl_mem), &cos2d);
     CL_CHECK_ERROR(err, "clSetKernelArg");
-    err = clSetKernelArg(kernel_sum, 2, sizeof(int), (int*)&h);
+    err = clSetKernelArg(kernel_preproc, 2, sizeof(cl_mem), &cldst);
     CL_CHECK_ERROR(err, "clSetKernelArg");
-    err = clSetKernelArg(kernel_sum, 3, sizeof(cl_mem), &clsum);
+    err = clSetKernelArg(kernel_preproc, 3, sizeof(float), &avg);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel_preproc, 4, sizeof(float), &std);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel_preproc, 5, sizeof(int), &w);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel_preproc, 6, sizeof(int), &h);
     CL_CHECK_ERROR(err, "clSetKernelArg");
 
     size_t work_size[2] = { w, h };
-    err = clEnqueueNDRangeKernel(queue, kernel_sum, 2, NULL, work_size, NULL, 0, NULL, &profile_event);
+    err = clEnqueueNDRangeKernel(queue, kernel_preproc, 2, NULL, work_size, NULL, 0, NULL, &profile_event);
     CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
     print_perf();
 
-    int sum_result = 0;
-    err = clEnqueueReadBuffer(queue, clsum, CL_TRUE, 0, sizeof(int), &sum_result, 0, NULL, NULL);
-    CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
-    printf("INFO: sum_result = %d, average_result = %f\n", sum_result, ((float)sum_result)/(w*h));
-
-    // Calculate standard deviation of log(src array)
-    cl_mem clstd = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(int), 0, &res);
+    vector<double> result(w*h, 0);
+    err = clEnqueueReadBuffer(queue, cldst, CL_TRUE, 0, sizeof(int), result.data(), 0, NULL, NULL);
     CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
 
-    cl_kernel kernel_std = clCreateKernel(program, "preproc_std", &err);
-    CL_CHECK_ERROR(err, "clCreateKernel");
-
-    err = clSetKernelArg(kernel_std, 0, sizeof(cl_mem), &clsrc);
-    CL_CHECK_ERROR(err, "clSetKernelArg");
-    err = clSetKernelArg(kernel_std, 1, sizeof(cl_mem), &clsum);
-    CL_CHECK_ERROR(err, "clSetKernelArg");
-    err = clSetKernelArg(kernel_std, 2, sizeof(int), (int*)&w);
-    CL_CHECK_ERROR(err, "clSetKernelArg");
-    err = clSetKernelArg(kernel_std, 3, sizeof(int), (int*)&h);
-    CL_CHECK_ERROR(err, "clSetKernelArg");
-    err = clSetKernelArg(kernel_std, 4, sizeof(cl_mem), &clstd);
-    CL_CHECK_ERROR(err, "clSetKernelArg");
-
-    err = clEnqueueNDRangeKernel(queue, kernel_std, 2, NULL, work_size, NULL, 0, NULL, &profile_event);
-    CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
-    print_perf();
-
-    int std_result = 0;
-    err = clEnqueueReadBuffer(queue, clstd, CL_TRUE, 0, sizeof(int), &std_result, 0, NULL, NULL);
-    CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
-    printf("INFO: std_sum = %d, std_result = %f\n", std_result, sqrt(((float)std_result) / (w * h)));
-
-    clReleaseMemObject(clsum);
-    clReleaseMemObject(clstd);
-    clReleaseKernel(kernel_sum);
-    clReleaseKernel(kernel_std);
-#endif
+    clReleaseKernel(kernel_preproc);
 }
 
 void track_init(const ROI& roi)
@@ -611,9 +582,13 @@ void track_init(const ROI& roi)
     cl_mem crop_dst;
     cl_mem affine_dst;
     cl_mem proc_dst;
+    cl_mem cos2d;
 
     // generate gauss distribution
     gpu_gauss2d(w, h, guass2d);
+
+    // cosine distribution
+    gpu_cos2d(w, h, cos2d);
 
     // execute GPU FFT
 #if 0
@@ -630,11 +605,13 @@ void track_init(const ROI& roi)
     affine_roi(w, h, crop_dst, affine_dst);
     dump_clbuf("gpu-affine", affine_dst, w * h, w, h, 0, false);
 
-    preproc(affine_dst, proc_dst, w, h);
+    preproc(affine_dst, cos2d, proc_dst, w, h);
+    dump_clbuf("gpu-preproc", proc_dst, w * h, w, h, 0, true);
 
     clReleaseMemObject(crop_dst);
     clReleaseMemObject(affine_dst);
     clReleaseMemObject(guass2d);
+    clReleaseMemObject(cos2d);
     //clReleaseMemObject(clbuffer);
     clReleaseMemObject(proc_dst);
 }
