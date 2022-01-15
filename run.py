@@ -8,6 +8,7 @@ app_dir = 'D:\\Code\\gpu_tracking\\gpu-object-tracking\\build\\bin'
 roi_file = '%s\\dump.gpu-roi.0000.517x421.yuv'%app_dir
 aff_file = '%s\\dump.gpu-affine.0000.517x421.yuv'%app_dir
 proc_file = '%s\\dump.0000.gpu-preproc.517x421.txt'%app_dir
+cos2d_file = '%s\\dump.0000.gpu-cos2d.517x421.txt'%app_dir
 
 def execute(cmd):
     print('#'*8, cmd)
@@ -53,16 +54,24 @@ def verify_fft():
     print('INFO: [%dx%d] sum of delta = %f, max = %f' % (w, h, np.sum(np.abs(ref - gpu)), np.max(np.abs(ref - gpu))))
 
 def verify_preproc():
+    # gpu result
     cmd = 'cd %s && %s' % (app_dir, app_name)
     execute(cmd)
-    gpu = np.genfromtxt(proc_file, dtype=float, delimiter=',')
-    gpu = gpu[:, :-1]
+    gpu_cos2d = np.genfromtxt(cos2d_file, dtype=float, delimiter=',')
+    gpu_cos2d = gpu_cos2d[:, :-1]
+    gpu_proc = np.genfromtxt(proc_file, dtype=float, delimiter=',')
+    gpu_proc = gpu_proc[:, :-1]
+    # reference result
     aff = np.fromfile(aff_file, dtype=np.uint8).reshape((h, w))
     cos2d = cv2.createHanningWindow((w, h), cv2.CV_32F)
+    np.savetxt('%s\\ref.cos2d.txt'%app_dir, cos2d, fmt='%-14.6f', delimiter=', ')
+    print('cos-diff = %f' % np.sum(np.abs(cos2d -gpu_cos2d)))
+
     ref = np.log(np.float32(aff) + 1.0)
     ref = (ref - ref.mean()) / (ref.std() + 1e-5)
     ref = ref * cos2d
-    print('diff = %f' % np.sum(np.abs(ref -gpu)))
+    np.savetxt('%s\\ref.proc.txt'%app_dir, ref, fmt='%-14.6f', delimiter=', ')
+    print('proc-diff = %f' % np.sum(np.abs(ref -gpu_proc)))
 
 # verify_affine()
 # verify_fft()

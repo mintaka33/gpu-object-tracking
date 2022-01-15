@@ -128,7 +128,7 @@ void init_srcbuf(char* buf, int size)
 void dump_clbuf(char* tag, cl_mem clbuffer, uint64_t size, int w, int h, int i, bool istext)
 {
     cl_int res;
-    vector<double> outdata(size, 0);
+    vector<char> outdata(size, 0);
     res = clEnqueueReadBuffer(queue, clbuffer, CL_TRUE, 0, size, outdata.data(), 0, NULL, NULL);
     CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
     clFinish(queue);
@@ -155,26 +155,23 @@ void gpu_hanning(size_t n, cl_mem &cos1d)
     CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
     print_perf();
 
-    vector<double> host_cos1d(n);
-    err = clEnqueueReadBuffer(queue, cos1d, CL_TRUE, 0, sizeof(double) * n, host_cos1d.data(), 0, NULL, NULL);
-    CL_CHECK_ERROR(err, "clEnqueueReadBuffer");
-
     clReleaseKernel(kernel);
 }
 
-void gpu_cos2d(size_t width, size_t height, cl_mem& cos2d)
+void gpu_cos2d(size_t w, size_t h, cl_mem& cos2d)
 {
-    cos2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
+    cos2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * w * h, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
 
-    cl_mem cosw = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width, nullptr, &err);
+    cl_mem cosw = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * w, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
-    gpu_hanning(width, cosw);
+    gpu_hanning(w, cosw);
+    dump_clbuf("gpu-cosw", cosw, sizeof(double)*w * 1, w, 1, 0, true);
 
-    cl_mem cosh = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * height, nullptr, &err);
+    cl_mem cosh = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * h, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
-    gpu_hanning(height, cosh);
-
+    gpu_hanning(h, cosh);
+    dump_clbuf("gpu-cosh", cosh, sizeof(double) * h * 1, h, 1, 0, true);
 
     cl_kernel kernel = clCreateKernel(program, "cosine2d", &err);
     CL_CHECK_ERROR(err, "clCreateKernel");
@@ -188,22 +185,16 @@ void gpu_cos2d(size_t width, size_t height, cl_mem& cos2d)
     err = clSetKernelArg(kernel, 2, sizeof(cl_mem), &cosh);
     CL_CHECK_ERROR(err, "clSetKernelArg");
 
-    err = clSetKernelArg(kernel, 3, sizeof(int), (int*)&width);
+    err = clSetKernelArg(kernel, 3, sizeof(int), (int*)&w);
     CL_CHECK_ERROR(err, "clSetKernelArg");
 
-    err = clSetKernelArg(kernel, 4, sizeof(int), (int*)&height);
+    err = clSetKernelArg(kernel, 4, sizeof(int), (int*)&h);
     CL_CHECK_ERROR(err, "clSetKernelArg");
 
-    size_t cos2d_work_size[2] = { width, height };
+    size_t cos2d_work_size[2] = { w, h };
     err = clEnqueueNDRangeKernel(queue, kernel, 2, NULL, cos2d_work_size, NULL, 0, NULL, &profile_event);
     CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
     print_perf();
-
-    vector<double> host_cos2d(width* height);
-    err = clEnqueueReadBuffer(queue, cos2d, CL_TRUE, 0, sizeof(double) * width * height, host_cos2d.data(), 0, NULL, NULL);
-    CL_CHECK_ERROR(err, "clEnqueueReadBuffer");
-
-    dump2text("cos2d-gpu", host_cos2d.data(), width, height);
 
     clReleaseKernel(kernel);
     clReleaseMemObject(cosw);
@@ -461,10 +452,10 @@ void test_gpu_affine(size_t x, size_t y, size_t w, size_t h)
     cl_mem affine_dst;
 
     crop_roi(w, h, x, y, crop_dst);
-    dump_clbuf("gpu-roi", crop_dst, w*h, w, h, 0, false);
+    dump_clbuf("gpu-roi", crop_dst, sizeof(char)*w*h, w, h, 0, false);
 
     affine_roi(w, h, crop_dst, affine_dst);
-    dump_clbuf("gpu-affine", affine_dst, w * h, w, h, 0, false);
+    dump_clbuf("gpu-affine", affine_dst, sizeof(char)*w * h, w, h, 0, false);
 
     clReleaseMemObject(crop_dst);
     clReleaseMemObject(affine_dst);
@@ -589,6 +580,7 @@ void track_init(const ROI& roi)
 
     // cosine distribution
     gpu_cos2d(w, h, cos2d);
+    dump_clbuf("gpu-cos2d", cos2d, sizeof(double) * w * h, w, h, 0, true);
 
     // execute GPU FFT
 #if 0
@@ -597,6 +589,7 @@ void track_init(const ROI& roi)
     dump_clbuf("gpu-fft", clbuffer, 2 * w * h, 2*w, h, 0, true);
 #endif
 
+#if 1
     // crop the ROI region from source frame
     crop_roi(w, h, x, y, crop_dst);
     dump_clbuf("gpu-roi", crop_dst, w * h, w, h, 0, false);
@@ -614,6 +607,7 @@ void track_init(const ROI& roi)
     clReleaseMemObject(cos2d);
     //clReleaseMemObject(clbuffer);
     clReleaseMemObject(proc_dst);
+#endif
 }
 
 void parse_arg(int argc, char** argv)
