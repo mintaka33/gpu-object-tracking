@@ -173,6 +173,7 @@ void gpu_cos2d(size_t w, size_t h, cl_mem& cos2d)
     gpu_hanning(h, cosh);
     dump_clbuf("gpu-cosh", cosh, sizeof(double) * h * 1, h, 1, 0, true);
 
+#if 1
     cl_kernel kernel = clCreateKernel(program, "cosine2d", &err);
     CL_CHECK_ERROR(err, "clCreateKernel");
 
@@ -199,6 +200,7 @@ void gpu_cos2d(size_t w, size_t h, cl_mem& cos2d)
     clReleaseKernel(kernel);
     clReleaseMemObject(cosw);
     clReleaseMemObject(cosh);
+#endif
 }
 
 void gpu_gauss2d(size_t width, size_t height, cl_mem& guass2d)
@@ -589,7 +591,6 @@ void track_init(const ROI& roi)
     dump_clbuf("gpu-fft", clbuffer, 2 * w * h, 2*w, h, 0, true);
 #endif
 
-#if 1
     // crop the ROI region from source frame
     crop_roi(w, h, x, y, crop_dst);
     dump_clbuf("gpu-roi", crop_dst, w * h, w, h, 0, false);
@@ -599,7 +600,7 @@ void track_init(const ROI& roi)
     dump_clbuf("gpu-affine", affine_dst, w * h, w, h, 0, false);
 
     preproc(affine_dst, cos2d, proc_dst, w, h);
-    dump_clbuf("gpu-preproc", proc_dst, w * h, w, h, 0, true);
+    dump_clbuf("gpu-preproc", proc_dst, sizeof(double) * w * h, w, h, 0, true);
 
     clReleaseMemObject(crop_dst);
     clReleaseMemObject(affine_dst);
@@ -607,7 +608,6 @@ void track_init(const ROI& roi)
     clReleaseMemObject(cos2d);
     //clReleaseMemObject(clbuffer);
     clReleaseMemObject(proc_dst);
-#endif
 }
 
 void parse_arg(int argc, char** argv)
