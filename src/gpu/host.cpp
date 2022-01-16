@@ -166,14 +166,13 @@ void gpu_cos2d(size_t w, size_t h, cl_mem& cos2d)
     cl_mem cosw = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * w, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
     gpu_hanning(w, cosw);
-    dump_clbuf("gpu-cosw", cosw, sizeof(double)*w * 1, w, 1, 0, true);
+    //dump_clbuf("gpu-cosw", cosw, sizeof(double)*w * 1, w, 1, 0, true);
 
     cl_mem cosh = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * h, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
     gpu_hanning(h, cosh);
-    dump_clbuf("gpu-cosh", cosh, sizeof(double) * h * 1, h, 1, 0, true);
+    //dump_clbuf("gpu-cosh", cosh, sizeof(double) * h * 1, h, 1, 0, true);
 
-#if 1
     cl_kernel kernel = clCreateKernel(program, "cosine2d", &err);
     CL_CHECK_ERROR(err, "clCreateKernel");
 
@@ -200,7 +199,6 @@ void gpu_cos2d(size_t w, size_t h, cl_mem& cos2d)
     clReleaseKernel(kernel);
     clReleaseMemObject(cosw);
     clReleaseMemObject(cosh);
-#endif
 }
 
 void gpu_gauss2d(size_t width, size_t height, cl_mem& guass2d)
@@ -571,11 +569,11 @@ void track_init(const ROI& roi)
     int x = roi.x;
     int y = roi.y;
     cl_mem guass2d;
-    cl_mem clbuffer;
     cl_mem crop_dst;
     cl_mem affine_dst;
     cl_mem proc_dst;
     cl_mem cos2d;
+    cl_mem G, F, H1, H2;
 
     // generate gauss distribution
     gpu_gauss2d(w, h, guass2d);
@@ -584,12 +582,10 @@ void track_init(const ROI& roi)
     gpu_cos2d(w, h, cos2d);
     dump_clbuf("gpu-cos2d", cos2d, sizeof(double) * w * h, w, h, 0, true);
 
-    // execute GPU FFT
-#if 0
-    resFFT = gpu_fft(guass2d, clbuffer, w, h, false);
+    // GPU FFT for guass2d
+    resFFT = gpu_fft(guass2d, G, w, h, false);
     printf("INFO: gpu_fft return = %d\n", resFFT);
-    dump_clbuf("gpu-fft", clbuffer, 2 * w * h, 2*w, h, 0, true);
-#endif
+    dump_clbuf("gpu-fft-G", G, sizeof(double) * 2 * w * h, 2*w, h, 0, true);
 
     // crop the ROI region from source frame
     crop_roi(w, h, x, y, crop_dst);
@@ -602,12 +598,19 @@ void track_init(const ROI& roi)
     preproc(affine_dst, cos2d, proc_dst, w, h);
     dump_clbuf("gpu-preproc", proc_dst, sizeof(double) * w * h, w, h, 0, true);
 
+    // GPU FFT for proc_dst
+    resFFT = gpu_fft(proc_dst, F, w, h, false);
+    printf("INFO: gpu_fft return = %d\n", resFFT);
+    dump_clbuf("gpu-fft-F", G, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
+
     clReleaseMemObject(crop_dst);
     clReleaseMemObject(affine_dst);
     clReleaseMemObject(guass2d);
     clReleaseMemObject(cos2d);
-    //clReleaseMemObject(clbuffer);
     clReleaseMemObject(proc_dst);
+    clReleaseMemObject(G);
+    clReleaseMemObject(F);
+
 }
 
 void parse_arg(int argc, char** argv)
