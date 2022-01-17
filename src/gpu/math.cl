@@ -38,7 +38,6 @@ __kernel void gauss2d(__global double *guass, int w, int h) {
   int y = get_global_id(1);
   int size_x = get_global_size(0);
   int size_y = get_global_size(1);
-  int i = y * w + x;
 
 #if KERNEL_LOG
   if (x == 0 && y == 0)
@@ -52,7 +51,8 @@ __kernel void gauss2d(__global double *guass, int w, int h) {
   double dy = (double)y - hh;
   double ep = (dx * dx + dy * dy) / ((double)(SIGMA * SIGMA));
 
-  guass[i] = exp(-0.5 * ep);
+  guass[y * w * 2 + 2 * x] = exp(-0.5 * ep); // real part
+  guass[y * w * 2 + 2 * x + 1] = exp(-0.5 * ep); // imaginary  part
 }
 
 __kernel void logf(__global uchar *src, __global double *dst, int w, int h) {
@@ -223,5 +223,6 @@ __kernel void preproc(__global uchar *src, __global double *cos2d, __global doub
 
   double eps = 0.00001;
   double a = log((float)src[y * w + x]);
-  dst[y * w + x] = ((a - avg) / (std + eps)) * cos2d[y * w + x];
+  dst[y * w * 2 + x*2] = ((a - avg) / (std + eps)) * cos2d[y * w + x];
+  dst[y * w * 2 + x*2 + 1] = 0;
 }

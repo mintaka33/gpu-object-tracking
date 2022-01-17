@@ -4,10 +4,10 @@ import cv2
 
 w, h = 517, 421
 app_name = 'gpu_math.exe'
-app_dir = 'D:\\Code\\gpu_tracking\\gpu-object-tracking\\build\\bin'
+app_dir = 'C:\\data\\work\\gpu_tracking\\gpu-object-tracking\\build\\bin'
 roi_file = '%s\\dump.gpu-roi.0000.517x421.yuv'%app_dir
 aff_file = '%s\\dump.gpu-affine.0000.517x421.yuv'%app_dir
-proc_file = '%s\\dump.0000.gpu-preproc.517x421.txt'%app_dir
+proc_file = '%s\\dump.0000.gpu-preproc.1034x421.txt'%app_dir
 cos2d_file = '%s\\dump.0000.gpu-cos2d.517x421.txt'%app_dir
 
 def execute(cmd):
@@ -61,6 +61,7 @@ def verify_preproc():
     gpu_cos2d = gpu_cos2d[:, :-1]
     gpu_proc = np.genfromtxt(proc_file, dtype=float, delimiter=',')
     gpu_proc = gpu_proc[:, :-1]
+    gpu_proc = gpu_proc[:, 0::2] # skip imaginary 
     # reference result
     aff = np.fromfile(aff_file, dtype=np.uint8).reshape((h, w))
     cos2d = cv2.createHanningWindow((w, h), cv2.CV_32F)

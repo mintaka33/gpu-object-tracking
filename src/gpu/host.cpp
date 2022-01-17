@@ -499,7 +499,7 @@ void test_gpu_fft(int w, int h)
 void preproc(cl_mem clsrc, cl_mem cos2d, cl_mem& cldst, int w, int h)
 {
     cl_int res;
-    cldst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * w * h, 0, &res);
+    cldst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * 2 * w * h, 0, &res);
     CL_CHECK_ERROR(err, "clCreateBuffer");
 
     vector<uint8_t> src(w*h, 0);
@@ -528,6 +528,7 @@ void preproc(cl_mem clsrc, cl_mem cos2d, cl_mem& cldst, int w, int h)
     }
     std = sqrt(std / (w * h));
     PFU_LEAVE;
+
     printf("Host preproc: avg = %f, std = %f\n", avg, std);
 
     cl_kernel kernel_preproc = clCreateKernel(program, "preproc", &err);
@@ -552,10 +553,6 @@ void preproc(cl_mem clsrc, cl_mem cos2d, cl_mem& cldst, int w, int h)
     err = clEnqueueNDRangeKernel(queue, kernel_preproc, 2, NULL, work_size, NULL, 0, NULL, &profile_event);
     CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
     print_perf();
-
-    vector<double> result(w*h, 0);
-    err = clEnqueueReadBuffer(queue, cldst, CL_TRUE, 0, sizeof(int), result.data(), 0, NULL, NULL);
-    CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
 
     clReleaseKernel(kernel_preproc);
 }
@@ -596,7 +593,7 @@ void track_init(const ROI& roi)
     dump_clbuf("gpu-affine", affine_dst, w * h, w, h, 0, false);
 
     preproc(affine_dst, cos2d, proc_dst, w, h);
-    dump_clbuf("gpu-preproc", proc_dst, sizeof(double) * w * h, w, h, 0, true);
+    dump_clbuf("gpu-preproc", proc_dst, sizeof(double) * 2 * w * h, 2*w, h, 0, true);
 
     // GPU FFT for proc_dst
     resFFT = gpu_fft(proc_dst, F, w, h, false);
