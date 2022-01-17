@@ -557,14 +557,8 @@ void preproc(cl_mem clsrc, cl_mem cos2d, cl_mem& cldst, int w, int h)
     clReleaseKernel(kernel_preproc);
 }
 
-void init_filter(cl_mem G, cl_mem F, cl_mem& H1, cl_mem& H2, int w, int h)
+void init_filter(cl_mem G, cl_mem F, cl_mem H1, cl_mem H2, int w, int h)
 {
-    cl_int res;
-    H1 = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * 2 * w * h, 0, &res);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-    H2 = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * 2 * w * h, 0, &res);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-
     cl_kernel kernel_initfilter  = clCreateKernel(program, "initfilter", &err);
     CL_CHECK_ERROR(err, "clCreateKernel");
 
@@ -620,21 +614,33 @@ void track_init(const ROI& roi)
     crop_roi(w, h, x, y, crop_dst);
     dump_clbuf("gpu-roi", crop_dst, w * h, w, h, 0, false);
 
-    // do affine transformation for the ROI region
-    affine_roi(w, h, crop_dst, affine_dst);
-    dump_clbuf("gpu-affine", affine_dst, w * h, w, h, 0, false);
+    // allocate buffers for filter template
+    H1 = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * 2 * w * h, 0, &res);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+    H2 = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * 2 * w * h, 0, &res);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
 
-    preproc(affine_dst, cos2d, proc_dst, w, h);
-    dump_clbuf("gpu-preproc", proc_dst, sizeof(double) * 2 * w * h, 2*w, h, 0, true);
+    // train filter template 
+    for (size_t i = 0; i < 16; i++)
+    {
+        // do affine transformation for the ROI region
+        affine_roi(w, h, crop_dst, affine_dst);
+        //dump_clbuf("gpu-affine", affine_dst, w * h, w, h, 0, false);
 
-    // GPU FFT for proc_dst
-    resFFT = gpu_fft(proc_dst, F, w, h, false);
-    printf("INFO: gpu_fft return = %d\n", resFFT);
-    dump_clbuf("gpu-fft-F", G, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
+        preproc(affine_dst, cos2d, proc_dst, w, h);
+        //dump_clbuf("gpu-preproc", proc_dst, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
 
-    // initialize filter
-    init_filter(G, F, H1, H2, w, h);
+        // GPU FFT for proc_dst
+        resFFT = gpu_fft(proc_dst, F, w, h, false);
+        printf("INFO: gpu_fft return = %d\n", resFFT);
+        //dump_clbuf("gpu-fft-F", G, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
+
+        // initialize filter
+        init_filter(G, F, H1, H2, w, h);
+    }
+
     dump_clbuf("gpu-init-H1", H1, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
+    dump_clbuf("gpu-init-H2", H2, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
 
     clReleaseMemObject(crop_dst);
     clReleaseMemObject(affine_dst);
@@ -643,7 +649,8 @@ void track_init(const ROI& roi)
     clReleaseMemObject(proc_dst);
     clReleaseMemObject(G);
     clReleaseMemObject(F);
-
+    clReleaseMemObject(H1);
+    clReleaseMemObject(H2);
 }
 
 void parse_arg(int argc, char** argv)

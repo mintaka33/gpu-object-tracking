@@ -74,9 +74,9 @@ def verify_preproc():
     np.savetxt('%s\\ref.proc.txt'%app_dir, ref, fmt='%-14.6f', delimiter=', ')
     print('proc-diff = %f' % np.sum(np.abs(ref -gpu_proc)))
 
+
 # verify_affine()
 # verify_fft()
-
-verify_preproc()
+# verify_preproc()
 
 print('done')
