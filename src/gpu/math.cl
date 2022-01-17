@@ -226,3 +226,30 @@ __kernel void preproc(__global uchar *src, __global double *cos2d, __global doub
   dst[y * w * 2 + x*2] = ((a - avg) / (std + eps)) * cos2d[y * w + x];
   dst[y * w * 2 + x*2 + 1] = 0;
 }
+
+__kernel void initfilter(__global double *G, __global double *F, __global double *H1, __global double *H2, int w, int h)
+{
+  int i = get_global_id(0);
+  int j = get_global_id(1);
+  int size_x = get_global_size(0);
+  int size_y = get_global_size(1);
+
+#if KERNEL_LOG
+  if (i == 0 && j == 0) {
+    printf("kernel_log:initfilter: size_x = %d, size_y = %d, w = %d, h = %d\n", size_x, size_y, w, h);
+  }
+#endif
+
+  // H1 += G * np.conj(Fi)
+  // H2 += Fi * np.conj(Fi)
+  double a = G[j * w * 2 + i * 2 + 0];
+  double b = G[j * w * 2 + i * 2 + 1];
+  double c = F[j * w * 2 + i * 2 + 0];
+  double d = F[j * w * 2 + i * 2 + 1];
+  // (a+bi)*(c-di) = (ac + bd) + (bc-ad)i
+  H1[j * w * 2 + i * 2 + 0] += a * c + b * d;
+  H1[j * w * 2 + i * 2 + 1] += b * c - a * d;
+  // (c+di)*(c-di) = (cc+dd)i
+  H2[j * w * 2 + i * 2 + 0] += c * c + d * d;
+  H2[j * w * 2 + i * 2 + 1] += 0;
+}

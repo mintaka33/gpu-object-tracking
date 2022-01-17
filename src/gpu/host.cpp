@@ -557,6 +557,38 @@ void preproc(cl_mem clsrc, cl_mem cos2d, cl_mem& cldst, int w, int h)
     clReleaseKernel(kernel_preproc);
 }
 
+void init_filter(cl_mem G, cl_mem F, cl_mem& H1, cl_mem& H2, int w, int h)
+{
+    cl_int res;
+    H1 = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * 2 * w * h, 0, &res);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+    H2 = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * 2 * w * h, 0, &res);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+
+    cl_kernel kernel_initfilter  = clCreateKernel(program, "initfilter", &err);
+    CL_CHECK_ERROR(err, "clCreateKernel");
+
+    err = clSetKernelArg(kernel_initfilter, 0, sizeof(cl_mem), &G);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel_initfilter, 1, sizeof(cl_mem), &F);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel_initfilter, 2, sizeof(cl_mem), &H1);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel_initfilter, 3, sizeof(cl_mem), &H2);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel_initfilter, 4, sizeof(int), &w);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel_initfilter, 5, sizeof(int), &h);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+
+    size_t work_size[2] = { w, h };
+    err = clEnqueueNDRangeKernel(queue, kernel_initfilter, 2, NULL, work_size, NULL, 0, NULL, &profile_event);
+    CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
+    print_perf();
+
+    clReleaseKernel(kernel_initfilter);
+}
+
 void track_init(const ROI& roi)
 {
     VkFFTResult resFFT = VKFFT_SUCCESS;
@@ -599,6 +631,10 @@ void track_init(const ROI& roi)
     resFFT = gpu_fft(proc_dst, F, w, h, false);
     printf("INFO: gpu_fft return = %d\n", resFFT);
     dump_clbuf("gpu-fft-F", G, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
+
+    // initialize filter
+    init_filter(G, F, H1, H2, w, h);
+    dump_clbuf("gpu-init-H1", H1, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
 
     clReleaseMemObject(crop_dst);
     clReleaseMemObject(affine_dst);
