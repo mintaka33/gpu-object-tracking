@@ -44,7 +44,7 @@ typedef struct _TrackRes {
     cl_mem affine_dst;
     cl_mem proc_dst;
     cl_mem cos2d;
-    cl_mem G, F, H1, H2;
+    cl_mem G, F, H1, H2, R;
 } TrackRes;
 
 static TrackRes tkres = {};
@@ -584,6 +584,34 @@ void train_filter(cl_mem G, cl_mem F, cl_mem H1, cl_mem H2, int w, int h)
     clReleaseKernel(kernel_train);
 }
 
+void correlate(cl_mem G, cl_mem F, cl_mem H1, cl_mem H2, cl_mem C, int w, int h)
+{
+    cl_kernel kernel_corr = clCreateKernel(program, "correlate", &err);
+    CL_CHECK_ERROR(err, "clCreateKernel");
+
+    err = clSetKernelArg(kernel_corr, 0, sizeof(cl_mem), &G);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel_corr, 1, sizeof(cl_mem), &F);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel_corr, 2, sizeof(cl_mem), &H1);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel_corr, 3, sizeof(cl_mem), &H2);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel_corr, 4, sizeof(cl_mem), &C);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel_corr, 5, sizeof(int), &w);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+    err = clSetKernelArg(kernel_corr, 6, sizeof(int), &h);
+    CL_CHECK_ERROR(err, "clSetKernelArg");
+
+    size_t work_size[2] = { w, h };
+    err = clEnqueueNDRangeKernel(queue, kernel_corr, 2, NULL, work_size, NULL, 0, NULL, &profile_event);
+    CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
+    print_perf();
+
+    clReleaseKernel(kernel_corr);
+}
+
 void track_alloc(int w, int h)
 {
     int fft_size = sizeof(double) * w * 2 * h; // complex number
@@ -614,6 +642,9 @@ void track_alloc(int w, int h)
     CL_CHECK_ERROR(err, "clCreateBuffer");
 
     tkres.H2 = clCreateBuffer(context, CL_MEM_READ_WRITE, fft_size, 0, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+
+    tkres.R = clCreateBuffer(context, CL_MEM_READ_WRITE, fft_size, 0, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
 }
 
@@ -647,10 +678,10 @@ void track_init(const ROI& roi, char* srcbuf, int srcw, int srch)
     {
         // do affine transformation for the ROI region
         affine_roi(w, h, tkres.crop_dst, tkres.affine_dst);
-        //dump_clbuf("gpu-affine", affine_dst, w * h, w, h, 0, false);
+        //dump_clbuf("gpu-affine", tkres.affine_dst, w * h, w, h, 0, false);
 
         preproc(tkres.affine_dst, tkres.cos2d, tkres.proc_dst, w, h);
-        //dump_clbuf("gpu-preproc", proc_dst, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
+        //dump_clbuf("gpu-preproc", tkres.proc_dst, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
 
         // GPU FFT for proc_dst
         resFFT = gpu_fft(tkres.proc_dst, tkres.F, w, h, false);
@@ -665,9 +696,28 @@ void track_init(const ROI& roi, char* srcbuf, int srcw, int srch)
     dump_clbuf("gpu-init-H2", tkres.H2, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
 }
 
-void track_update(const ROI& roi, char* srcbuf, int srcw, int srch)
+void track_update(const ROI& roi, char* srcbuf, int srcw, int srch, int index)
 {
+    VkFFTResult resFFT = VKFFT_SUCCESS;
+    cl_int res = CL_SUCCESS;
+    int w = roi.width;
+    int h = roi.height;
+    int x = roi.x;
+    int y = roi.y;
 
+    crop_roi(srcbuf, srcw, srch, w, h, x, y, tkres.crop_dst);
+    //dump_clbuf("gpu-roi", tkres.crop_dst, w * h, w, h, index, false);
+
+    preproc(tkres.crop_dst, tkres.cos2d, tkres.proc_dst, w, h);
+
+    resFFT = gpu_fft(tkres.proc_dst, tkres.F, w, h, false);
+    if (resFFT != VKFFT_SUCCESS) {
+        printf("ERROR: gpu_fft failed with return = %d exit...\n", resFFT);
+        exit(1);
+    }
+    
+    correlate(tkres.G, tkres.F, tkres.H1, tkres.H2, tkres.R, w, h);
+    dump_clbuf("gpu-fft-C", tkres.R, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
 }
 
 void track_destroy()
@@ -681,6 +731,7 @@ void track_destroy()
     clReleaseMemObject(tkres.F);
     clReleaseMemObject(tkres.H1);
     clReleaseMemObject(tkres.H2);
+    clReleaseMemObject(tkres.R);
 }
 
 void parse_arg(int argc, char** argv)
@@ -730,8 +781,9 @@ int main(int argc, char** argv)
     get_frame((char*)inbuf.data(), srcw * srch, 0);
     track_init(roi, (char*)inbuf.data(), srcw, srch);
 
-    get_frame((char*)inbuf.data(), srcw * srch, 1);
-    track_update(roi, (char*)inbuf.data(), srcw, srch);
+    int index = 1;
+    get_frame((char*)inbuf.data(), srcw * srch, index);
+    track_update(roi, (char*)inbuf.data(), srcw, srch, index);
 
     track_destroy();
 

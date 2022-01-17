@@ -140,30 +140,6 @@ __kernel void affine(__global uchar *src, __global uchar *dst,
   dst[(j * w + i)] = p;
 }
 
-static float atomic_cmpxchg_f32(volatile __global float *p, float cmp,
-                                float val) {
-  union {
-    unsigned int u32;
-    float f32;
-  } cmp_union, val_union, old_union;
-
-  cmp_union.f32 = cmp;
-  val_union.f32 = val;
-  old_union.u32 = atomic_cmpxchg((volatile __global unsigned int *)p,
-                                 cmp_union.u32, val_union.u32);
-  return old_union.f32;
-}
-
-static float atomic_add_f32(volatile __global float *p, float val) {
-  float found = *p;
-  float expected;
-  do {
-    expected = found;
-    found = atomic_cmpxchg_f32(p, expected, expected + val);
-  } while (found != expected);
-  return found;
-}
-
 __kernel void preproc_sum(__global uchar *src, int w, int h,
                           __global int *sum) {
   int x = get_global_id(0);
@@ -181,8 +157,7 @@ __kernel void preproc_sum(__global uchar *src, int w, int h,
   // the mimic of atomic_add_float is too costly to use
   // atomic_add_f32(sum, log((float)(src[y*w+x])));
 
-  // use build-in atomic_add int, there might be loss due to rounding float to
-  // int
+  // use build-in atomic_add int, there might be loss due to rounding float to int
   float a = log((float)src[y * w + x]);
   atomic_add(sum, (int)round(a));
 }
@@ -252,4 +227,27 @@ __kernel void calcH(__global double *G, __global double *F, __global double *H1,
   // (c+di)*(c-di) = (cc+dd)i
   H2[j * w * 2 + i * 2 + 0] += c * c + d * d;
   H2[j * w * 2 + i * 2 + 1] += 0;
+}
+
+__kernel void correlate(__global double *G, __global double *F, __global double *H1, __global double *H2, __global double *R, int w, int h)
+{
+  int i = get_global_id(0);
+  int j = get_global_id(1);
+
+  // calculate H = H1 / H2
+  double a = H1[j * 2 * w + 2 * i + 0];
+  double b = H1[j * 2 * w + 2 * i + 1];
+  double c = H2[j * 2 * w + 2 * i + 0];
+  double d = H2[j * 2 * w + 2 * i + 1];
+  double temp1 = (a * c + b * d) / (c * c + d * d);
+  double temp2 = (b * c - a * d) / (c * c + d * d);
+
+  // R = H * F
+  a =  temp1;
+  b =  temp2;
+  c = F[j * 2 * w + 2 * i + 0];
+  d = F[j * 2 * w + 2 * i + 1];
+
+  R[j * 2 * w + 2 * i + 0] = 1; //a * c - b * d;
+  R[j * 2 * w + 2 * i + 1] = 2; //a * d + b * c;
 }

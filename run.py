@@ -5,8 +5,8 @@ import cv2
 w, h = 517, 421
 app_name = 'gpu_math.exe'
 app_dir = 'C:\\data\\work\\gpu_tracking\\gpu-object-tracking\\build\\bin'
-roi_file = '%s\\dump.gpu-roi.0000.517x421.yuv'%app_dir
-aff_file = '%s\\dump.gpu-affine.0000.517x421.yuv'%app_dir
+roi_file = '%s\\dump.gpu-roi.0001.517x421.yuv'%app_dir
+aff_file = '%s\\dump.gpu-affine.0001.517x421.yuv'%app_dir
 proc_file = '%s\\dump.0000.gpu-preproc.1034x421.txt'%app_dir
 cos2d_file = '%s\\dump.0000.gpu-cos2d.517x421.txt'%app_dir
 
@@ -16,7 +16,7 @@ def execute(cmd):
 
 def verify_affine():
     cmd = 'cd %s && %s' % (app_dir, app_name)
-    execute(cmd)
+    # execute(cmd)
 
     frame = np.fromfile(roi_file, dtype=np.uint8, count=w*h).reshape((h, w))
     cv2.imwrite('%s\\roi.bmp' % app_dir, frame)
@@ -75,7 +75,7 @@ def verify_preproc():
     print('proc-diff = %f' % np.sum(np.abs(ref -gpu_proc)))
 
 
-# verify_affine()
+verify_affine()
 # verify_fft()
 # verify_preproc()
 
