@@ -51,7 +51,7 @@ __kernel void gauss2d(__global double *guass, int w, int h) {
   double dy = (double)y - hh;
   double ep = (dx * dx + dy * dy) / ((double)(SIGMA * SIGMA));
 
-  guass[y * w * 2 + 2 * x] = exp(-0.5 * ep); // real part
+  guass[y * w * 2 + 2 * x] = exp(-0.5 * ep);     // real part
   guass[y * w * 2 + 2 * x + 1] = exp(-0.5 * ep); // imaginary  part
 }
 
@@ -157,7 +157,8 @@ __kernel void preproc_sum(__global uchar *src, int w, int h,
   // the mimic of atomic_add_float is too costly to use
   // atomic_add_f32(sum, log((float)(src[y*w+x])));
 
-  // use build-in atomic_add int, there might be loss due to rounding float to int
+  // use build-in atomic_add int, there might be loss due to rounding float to
+  // int
   float a = log((float)src[y * w + x]);
   atomic_add(sum, (int)round(a));
 }
@@ -183,8 +184,9 @@ __kernel void preproc_std(__global uchar *src, __global int *log_sum, int w,
   atomic_add(std_sum, (int)round(b));
 }
 
-__kernel void preproc(__global uchar *src, __global double *cos2d, __global double *dst, float avg, float std, int w, int h)
-{
+__kernel void preproc(__global uchar *src, __global double *cos2d,
+                      __global double *dst, float avg, float std, int w,
+                      int h) {
   int x = get_global_id(0);
   int y = get_global_id(1);
   int size_x = get_global_size(0);
@@ -192,18 +194,19 @@ __kernel void preproc(__global uchar *src, __global double *cos2d, __global doub
 
 #if KERNEL_LOG
   if (x == 0 && y == 0) {
-    printf("kernel_log:preproc_std: size_x = %d, size_y = %d, w = %d, h = %d\n", size_x, size_y, w, h);
+    printf("kernel_log:preproc_std: size_x = %d, size_y = %d, w = %d, h = %d\n",
+           size_x, size_y, w, h);
   }
 #endif
 
   double eps = 0.00001;
-  double a = log((float)src[y * w + x]);
-  dst[y * w * 2 + x*2] = ((a - avg) / (std + eps)) * cos2d[y * w + x];
-  dst[y * w * 2 + x*2 + 1] = 0;
+  double a = log((float)src[y * w + x]/255.0); // nornalization
+  dst[y * w * 2 + x * 2] = ((a - avg) / (std + eps)) * cos2d[y * w + x];
+  dst[y * w * 2 + x * 2 + 1] = 0;
 }
 
-__kernel void calcH(__global double *G, __global double *F, __global double *H1, __global double *H2, int w, int h)
-{
+__kernel void calcH(__global double *G, __global double *F, __global double *H1,
+                    __global double *H2, int w, int h) {
   int i = get_global_id(0);
   int j = get_global_id(1);
   int size_x = get_global_size(0);
@@ -211,7 +214,8 @@ __kernel void calcH(__global double *G, __global double *F, __global double *H1,
 
 #if KERNEL_LOG
   if (i == 0 && j == 0) {
-    printf("kernel_log:initfilter: size_x = %d, size_y = %d, w = %d, h = %d\n", size_x, size_y, w, h);
+    printf("kernel_log:initfilter: size_x = %d, size_y = %d, w = %d, h = %d\n",
+           size_x, size_y, w, h);
   }
 #endif
 
@@ -229,8 +233,9 @@ __kernel void calcH(__global double *G, __global double *F, __global double *H1,
   H2[j * w * 2 + i * 2 + 1] += 0;
 }
 
-__kernel void correlate(__global double *G, __global double *F, __global double *H1, __global double *H2, __global double *R, int w, int h)
-{
+__kernel void correlate(__global double *G, __global double *F,
+                        __global double *H1, __global double *H2,
+                        __global double *R, int w, int h) {
   int i = get_global_id(0);
   int j = get_global_id(1);
 
@@ -243,11 +248,11 @@ __kernel void correlate(__global double *G, __global double *F, __global double 
   double temp2 = (b * c - a * d) / (c * c + d * d);
 
   // R = H * F
-  a =  temp1;
-  b =  temp2;
+  a = temp1;
+  b = temp2;
   c = F[j * 2 * w + 2 * i + 0];
   d = F[j * 2 * w + 2 * i + 1];
 
-  R[j * 2 * w + 2 * i + 0] = 1; //a * c - b * d;
-  R[j * 2 * w + 2 * i + 1] = 2; //a * d + b * c;
+  R[j * 2 * w + 2 * i + 0] = 1; // a * c - b * d;
+  R[j * 2 * w + 2 * i + 1] = 2; // a * d + b * c;
 }
