@@ -227,7 +227,7 @@ __kernel void preproc(__global uchar *src, __global double *cos2d, __global doub
   dst[y * w * 2 + x*2 + 1] = 0;
 }
 
-__kernel void initfilter(__global double *G, __global double *F, __global double *H1, __global double *H2, int w, int h)
+__kernel void calcH(__global double *G, __global double *F, __global double *H1, __global double *H2, int w, int h)
 {
   int i = get_global_id(0);
   int j = get_global_id(1);

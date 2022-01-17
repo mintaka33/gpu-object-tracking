@@ -38,6 +38,16 @@ typedef struct _ROI {
     size_t height;
 } ROI;
 
+typedef struct _TrackRes {
+    cl_mem guass2d;
+    cl_mem crop_dst;
+    cl_mem affine_dst;
+    cl_mem proc_dst;
+    cl_mem cos2d;
+    cl_mem G, F, H1, H2;
+} TrackRes;
+
+static TrackRes tkres = {};
 static ROI roi = {};
 static int g_dump_result = true;
 
@@ -112,7 +122,7 @@ void print_perf()
     printf("INFO: kernel execution time = %f us\n", (time_end - time_start) / 1000.0);
 }
 
-void init_srcbuf(char* buf, int size)
+void get_frame(char* buf, int size, int index=0)
 {
     string yuvfile = "..\\..\\test.yuv";
     ifstream infile;
@@ -121,6 +131,7 @@ void init_srcbuf(char* buf, int size)
         printf("ERROR: failed to open input yuv file %s\n", yuvfile);
         exit(1);
     }
+    infile.seekg(size * index);
     infile.read(buf, size);
     infile.close();
 }
@@ -158,11 +169,8 @@ void gpu_hanning(size_t n, cl_mem &cos1d)
     clReleaseKernel(kernel);
 }
 
-void gpu_cos2d(size_t w, size_t h, cl_mem& cos2d)
+void gpu_cos2d(size_t w, size_t h, cl_mem cos2d)
 {
-    cos2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * w * h, nullptr, &err);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-
     cl_mem cosw = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * w, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
     gpu_hanning(w, cosw);
@@ -201,11 +209,8 @@ void gpu_cos2d(size_t w, size_t h, cl_mem& cos2d)
     clReleaseMemObject(cosh);
 }
 
-void gpu_gauss2d(size_t width, size_t height, cl_mem& guass2d)
+void gpu_gauss2d(size_t width, size_t height, cl_mem guass2d)
 {
-    guass2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-
     cl_kernel kernel = clCreateKernel(program, "gauss2d", &err);
     CL_CHECK_ERROR(err, "clCreateKernel");
 
@@ -314,7 +319,7 @@ void gpu_affine(cl_mem clsrc, cl_mem cldst, int w, int h, double m[2][3])
     clReleaseKernel(kernel);
 }
 
-VkFFTResult gpu_fft(cl_mem clinbuffer, cl_mem& clbuffer, int w, int h, bool r2c)
+VkFFTResult gpu_fft(cl_mem clinbuffer, cl_mem clbuffer, int w, int h, bool r2c)
 {
     cl_int res = CL_SUCCESS;
     //zero-initialize configuration + FFT application
@@ -341,10 +346,6 @@ VkFFTResult gpu_fft(cl_mem clinbuffer, cl_mem& clbuffer, int w, int h, bool r2c)
     configuration.device = &device;
     configuration.platform = &platform;
     configuration.context = &context;
-
-    // computation buffer in device
-    clbuffer = clCreateBuffer(context, CL_MEM_READ_WRITE, bufferSize, 0, &res);
-    CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
 
     configuration.inputBuffer = &clinbuffer;
     configuration.inputBufferSize = &inputBufferSize;
@@ -378,16 +379,20 @@ VkFFTResult gpu_fft(cl_mem clinbuffer, cl_mem& clbuffer, int w, int h, bool r2c)
     return VKFFT_SUCCESS;
 }
 
-void test_gpu_cos2d(size_t width, size_t height)
+void test_gpu_cos2d(size_t w, size_t h)
 {
-    cl_mem cos2d = 0;
-    gpu_cos2d(width, height, cos2d);
+    cl_mem cos2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * w * h, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+
+    gpu_cos2d(w, h, cos2d);
+
     clReleaseMemObject(cos2d);
 }
 
 void test_gpu_gauss2d(size_t w, size_t h)
 {
-    cl_mem guass2d;
+    cl_mem guass2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * w * h, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
 
     gpu_gauss2d(w, h, guass2d);
 
@@ -414,31 +419,20 @@ void test_gpu_preproc(size_t width, size_t height)
     clReleaseMemObject(data_log);
 }
 
-void crop_roi(size_t w, size_t h, size_t x, size_t y, cl_mem& crop_dst)
+void crop_roi(char* srcbuf, int srcw, int srch, size_t w, size_t h, size_t x, size_t y, cl_mem crop_dst)
 {
-    size_t srcw = 1920, srch = 1080;
-    vector<int8_t> inbuf(srcw * srch, 0);
-    init_srcbuf((char*)inbuf.data(), srcw * srch);
-    //dump2yuv("srcyuv", (uint8_t *)inbuf.data(), w, h, 0);
-
-    cl_mem crop_src = clCreateBuffer(context, CL_MEM_READ_ONLY, srcw * srch, nullptr, &err);
+    cl_mem crop_src = clCreateBuffer(context, CL_MEM_READ_ONLY, srcw*srch, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
-    err = clEnqueueWriteBuffer(queue, crop_src, CL_TRUE, 0, srcw * srch, inbuf.data(), 0, NULL, NULL);
+    err = clEnqueueWriteBuffer(queue, crop_src, CL_TRUE, 0, srcw * srch, srcbuf, 0, NULL, NULL);
     CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
-
-    crop_dst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, w * h, nullptr, &err);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
 
     gpu_crop(crop_src, crop_dst, srcw, srch, x, y, w, h);
 
     clReleaseMemObject(crop_src);
 }
 
-void affine_roi(size_t w, size_t h, cl_mem crop_dst, cl_mem& affine_dst)
+void affine_roi(size_t w, size_t h, cl_mem crop_dst, cl_mem affine_dst)
 {
-    affine_dst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, w * h, nullptr, &err);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-
     double m[2][3] = {};
     getMatrix(w, h, m[0]);
     printf("host matrix = \n %f, %f, %f \n %f, %f, %f \n", m[0][0], m[0][1], m[0][2], m[1][0], m[1][1], m[1][2]);
@@ -451,7 +445,18 @@ void test_gpu_affine(size_t x, size_t y, size_t w, size_t h)
     cl_mem crop_dst;
     cl_mem affine_dst;
 
-    crop_roi(w, h, x, y, crop_dst);
+    crop_dst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, w * h, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+
+    affine_dst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, w * h, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+
+    size_t srcw = 1920, srch = 1080;
+    vector<char> inbuf(srcw * srch, 0);
+    get_frame((char*)inbuf.data(), srcw * srch);
+    //dump2yuv("srcyuv", (uint8_t *)inbuf.data(), w, h, 0);
+
+    crop_roi((char*)inbuf.data(), srcw, srch, w, h, x, y, crop_dst);
     dump_clbuf("gpu-roi", crop_dst, sizeof(char)*w*h, w, h, 0, false);
 
     affine_roi(w, h, crop_dst, affine_dst);
@@ -496,12 +501,8 @@ void test_gpu_fft(int w, int h)
     clReleaseMemObject(clinbuffer);
 }
 
-void preproc(cl_mem clsrc, cl_mem cos2d, cl_mem& cldst, int w, int h)
+void preproc(cl_mem clsrc, cl_mem cos2d, cl_mem cldst, int w, int h)
 {
-    cl_int res;
-    cldst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * 2 * w * h, 0, &res);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-
     vector<uint8_t> src(w*h, 0);
     err = clEnqueueReadBuffer(queue, clsrc, CL_TRUE, 0, sizeof(uint8_t)*w*h, src.data(), 0, NULL, NULL);
     CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
@@ -557,33 +558,66 @@ void preproc(cl_mem clsrc, cl_mem cos2d, cl_mem& cldst, int w, int h)
     clReleaseKernel(kernel_preproc);
 }
 
-void init_filter(cl_mem G, cl_mem F, cl_mem H1, cl_mem H2, int w, int h)
+void train_filter(cl_mem G, cl_mem F, cl_mem H1, cl_mem H2, int w, int h)
 {
-    cl_kernel kernel_initfilter  = clCreateKernel(program, "initfilter", &err);
+    cl_kernel kernel_train  = clCreateKernel(program, "calcH", &err);
     CL_CHECK_ERROR(err, "clCreateKernel");
 
-    err = clSetKernelArg(kernel_initfilter, 0, sizeof(cl_mem), &G);
+    err = clSetKernelArg(kernel_train, 0, sizeof(cl_mem), &G);
     CL_CHECK_ERROR(err, "clSetKernelArg");
-    err = clSetKernelArg(kernel_initfilter, 1, sizeof(cl_mem), &F);
+    err = clSetKernelArg(kernel_train, 1, sizeof(cl_mem), &F);
     CL_CHECK_ERROR(err, "clSetKernelArg");
-    err = clSetKernelArg(kernel_initfilter, 2, sizeof(cl_mem), &H1);
+    err = clSetKernelArg(kernel_train, 2, sizeof(cl_mem), &H1);
     CL_CHECK_ERROR(err, "clSetKernelArg");
-    err = clSetKernelArg(kernel_initfilter, 3, sizeof(cl_mem), &H2);
+    err = clSetKernelArg(kernel_train, 3, sizeof(cl_mem), &H2);
     CL_CHECK_ERROR(err, "clSetKernelArg");
-    err = clSetKernelArg(kernel_initfilter, 4, sizeof(int), &w);
+    err = clSetKernelArg(kernel_train, 4, sizeof(int), &w);
     CL_CHECK_ERROR(err, "clSetKernelArg");
-    err = clSetKernelArg(kernel_initfilter, 5, sizeof(int), &h);
+    err = clSetKernelArg(kernel_train, 5, sizeof(int), &h);
     CL_CHECK_ERROR(err, "clSetKernelArg");
 
     size_t work_size[2] = { w, h };
-    err = clEnqueueNDRangeKernel(queue, kernel_initfilter, 2, NULL, work_size, NULL, 0, NULL, &profile_event);
+    err = clEnqueueNDRangeKernel(queue, kernel_train, 2, NULL, work_size, NULL, 0, NULL, &profile_event);
     CL_CHECK_ERROR(err, "clEnqueueNDRangeKernel");
     print_perf();
 
-    clReleaseKernel(kernel_initfilter);
+    clReleaseKernel(kernel_train);
 }
 
-void track_init(const ROI& roi)
+void track_alloc(int w, int h)
+{
+    int fft_size = sizeof(double) * w * 2 * h; // complex number
+
+    tkres.guass2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * w * h, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+
+    tkres.cos2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * w * h, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+
+    tkres.crop_dst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, w * h, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+
+    tkres.affine_dst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, w * h, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+
+    tkres.proc_dst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * 2 * w * h, 0, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+
+    // FFT output buffers
+    tkres.G = clCreateBuffer(context, CL_MEM_READ_WRITE, fft_size, 0, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+
+    tkres.F = clCreateBuffer(context, CL_MEM_READ_WRITE, fft_size, 0, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+
+    tkres.H1 = clCreateBuffer(context, CL_MEM_READ_WRITE, fft_size, 0, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+
+    tkres.H2 = clCreateBuffer(context, CL_MEM_READ_WRITE, fft_size, 0, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+}
+
+void track_init(const ROI& roi, char* srcbuf, int srcw, int srch)
 {
     VkFFTResult resFFT = VKFFT_SUCCESS;
     cl_int res = CL_SUCCESS;
@@ -591,66 +625,62 @@ void track_init(const ROI& roi)
     int h = roi.height;
     int x = roi.x;
     int y = roi.y;
-    cl_mem guass2d;
-    cl_mem crop_dst;
-    cl_mem affine_dst;
-    cl_mem proc_dst;
-    cl_mem cos2d;
-    cl_mem G, F, H1, H2;
 
     // generate gauss distribution
-    gpu_gauss2d(w, h, guass2d);
+    gpu_gauss2d(w, h, tkres.guass2d);
 
     // cosine distribution
-    gpu_cos2d(w, h, cos2d);
-    dump_clbuf("gpu-cos2d", cos2d, sizeof(double) * w * h, w, h, 0, true);
+    gpu_cos2d(w, h, tkres.cos2d);
+    dump_clbuf("gpu-cos2d", tkres.cos2d, sizeof(double) * w * h, w, h, 0, true);
 
     // GPU FFT for guass2d
-    resFFT = gpu_fft(guass2d, G, w, h, false);
+    resFFT = gpu_fft(tkres.guass2d, tkres.G, w, h, false);
     printf("INFO: gpu_fft return = %d\n", resFFT);
-    dump_clbuf("gpu-fft-G", G, sizeof(double) * 2 * w * h, 2*w, h, 0, true);
+    dump_clbuf("gpu-fft-G", tkres.G, sizeof(double) * 2 * w * h, 2*w, h, 0, true);
 
     // crop the ROI region from source frame
-    crop_roi(w, h, x, y, crop_dst);
-    dump_clbuf("gpu-roi", crop_dst, w * h, w, h, 0, false);
-
-    // allocate buffers for filter template
-    H1 = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * 2 * w * h, 0, &res);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-    H2 = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * 2 * w * h, 0, &res);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
+    crop_roi(srcbuf, srcw, srch, w, h, x, y, tkres.crop_dst);
+    dump_clbuf("gpu-roi", tkres.crop_dst, w * h, w, h, 0, false);
 
     // train filter template 
     for (size_t i = 0; i < 16; i++)
     {
         // do affine transformation for the ROI region
-        affine_roi(w, h, crop_dst, affine_dst);
+        affine_roi(w, h, tkres.crop_dst, tkres.affine_dst);
         //dump_clbuf("gpu-affine", affine_dst, w * h, w, h, 0, false);
 
-        preproc(affine_dst, cos2d, proc_dst, w, h);
+        preproc(tkres.affine_dst, tkres.cos2d, tkres.proc_dst, w, h);
         //dump_clbuf("gpu-preproc", proc_dst, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
 
         // GPU FFT for proc_dst
-        resFFT = gpu_fft(proc_dst, F, w, h, false);
+        resFFT = gpu_fft(tkres.proc_dst, tkres.F, w, h, false);
         printf("INFO: gpu_fft return = %d\n", resFFT);
         //dump_clbuf("gpu-fft-F", G, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
 
         // initialize filter
-        init_filter(G, F, H1, H2, w, h);
+        train_filter(tkres.G, tkres.F, tkres.H1, tkres.H2, w, h);
     }
 
-    dump_clbuf("gpu-init-H1", H1, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
-    dump_clbuf("gpu-init-H2", H2, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
+    dump_clbuf("gpu-init-H1", tkres.H1, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
+    dump_clbuf("gpu-init-H2", tkres.H2, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
+}
 
-    clReleaseMemObject(crop_dst);
-    clReleaseMemObject(affine_dst);
-    clReleaseMemObject(guass2d);
-    clReleaseMemObject(cos2d);
-    clReleaseMemObject(proc_dst);
-    clReleaseMemObject(G);
-    clReleaseMemObject(F);
-    clReleaseMemObject(H1);
-    clReleaseMemObject(H2);
+void track_update(const ROI& roi, char* srcbuf, int srcw, int srch)
+{
+
+}
+
+void track_destroy()
+{
+    clReleaseMemObject(tkres.crop_dst);
+    clReleaseMemObject(tkres.affine_dst);
+    clReleaseMemObject(tkres.guass2d);
+    clReleaseMemObject(tkres.cos2d);
+    clReleaseMemObject(tkres.proc_dst);
+    clReleaseMemObject(tkres.G);
+    clReleaseMemObject(tkres.F);
+    clReleaseMemObject(tkres.H1);
+    clReleaseMemObject(tkres.H2);
 }
 
 void parse_arg(int argc, char** argv)
@@ -682,6 +712,8 @@ void parse_arg(int argc, char** argv)
 
 int main(int argc, char** argv) 
 {
+    size_t srcw = 1920, srch = 1080;
+
     parse_arg(argc, argv);
 
     ocl_init();
@@ -692,9 +724,17 @@ int main(int argc, char** argv)
     //test_gpu_affine(roi.x, roi.y, roi.width, roi.height);
     //test_gpu_fft(roi.width, roi.height);
 
-    track_init(roi);
+    track_alloc(roi.width, roi.height);
+
+    vector<char> inbuf(srcw * srch, 0);
+    get_frame((char*)inbuf.data(), srcw * srch, 0);
+    track_init(roi, (char*)inbuf.data(), srcw, srch);
+
+    get_frame((char*)inbuf.data(), srcw * srch, 1);
+    track_update(roi, (char*)inbuf.data(), srcw, srch);
+
+    track_destroy();
 
     ocl_destroy();
-    
     return 0;
 }
