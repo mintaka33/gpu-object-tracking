@@ -253,6 +253,6 @@ __kernel void correlate(__global double *G, __global double *F,
   c = F[j * 2 * w + 2 * i + 0];
   d = F[j * 2 * w + 2 * i + 1];
 
-  R[j * 2 * w + 2 * i + 0] = 1; // a * c - b * d;
-  R[j * 2 * w + 2 * i + 1] = 2; // a * d + b * c;
+  R[j * 2 * w + 2 * i + 0] = a * c - b * d;
+  R[j * 2 * w + 2 * i + 1] = a * d + b * c;
 }

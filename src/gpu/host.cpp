@@ -717,7 +717,7 @@ void track_update(const ROI& roi, char* srcbuf, int srcw, int srch, int index)
     }
     
     correlate(tkres.G, tkres.F, tkres.H1, tkres.H2, tkres.R, w, h);
-    dump_clbuf("gpu-fft-C", tkres.R, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
+    dump_clbuf("gpu-fft-R", tkres.R, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
 }
 
 void track_destroy()
