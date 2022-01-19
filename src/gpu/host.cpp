@@ -391,12 +391,12 @@ void test_gpu_cos2d(size_t w, size_t h)
 
 void test_gpu_gauss2d(size_t w, size_t h)
 {
-    cl_mem guass2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * w * h, nullptr, &err);
+    cl_mem guass2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * w * 2 * h, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
 
     gpu_gauss2d(w, h, guass2d);
 
-    dump_clbuf("gpu-guass2d", guass2d, sizeof(double)*w*h, w, h, 0, true);
+    dump_clbuf("gpu-guass2d", guass2d, sizeof(double) * w * 2 * h, w * 2, h, 0, true);
 
     clReleaseMemObject(guass2d);
 }
@@ -584,7 +584,7 @@ void train_filter(cl_mem G, cl_mem F, cl_mem H1, cl_mem H2, int w, int h)
     clReleaseKernel(kernel_train);
 }
 
-void correlate(cl_mem G, cl_mem F, cl_mem H1, cl_mem H2, cl_mem C, int w, int h)
+void gpu_correlate(cl_mem G, cl_mem F, cl_mem H1, cl_mem H2, cl_mem C, int w, int h)
 {
     cl_kernel kernel_corr = clCreateKernel(program, "correlate", &err);
     CL_CHECK_ERROR(err, "clCreateKernel");
@@ -657,43 +657,44 @@ void track_init(const ROI& roi, char* srcbuf, int srcw, int srch)
     int x = roi.x;
     int y = roi.y;
 
-    // generate gauss distribution
-    gpu_gauss2d(w, h, tkres.guass2d);
-
     // cosine distribution
     gpu_cos2d(w, h, tkres.cos2d);
     dump_clbuf("gpu-cos2d", tkres.cos2d, sizeof(double) * w * h, w, h, 0, true);
 
+    // generate gauss distribution
+    gpu_gauss2d(w, h, tkres.guass2d);
+    dump_clbuf("gpu-gauss2d", tkres.guass2d, sizeof(double) * w * h, w, h, 0, true);
+
     // GPU FFT for guass2d
     resFFT = gpu_fft(tkres.guass2d, tkres.G, w, h, false);
     printf("INFO: gpu_fft return = %d\n", resFFT);
-    dump_clbuf("gpu-fft-G", tkres.G, sizeof(double) * 2 * w * h, 2*w, h, 0, true);
+    dump_clbuf("gpu-G", tkres.G, sizeof(double) * 2 * w * h, 2*w, h, 0, true);
 
     // crop the ROI region from source frame
     crop_roi(srcbuf, srcw, srch, w, h, x, y, tkres.crop_dst);
     dump_clbuf("gpu-roi", tkres.crop_dst, w * h, w, h, 0, false);
 
     // train filter template 
-    for (size_t i = 0; i < 16; i++)
+    for (size_t i = 0; i < 1; i++)
     {
         // do affine transformation for the ROI region
         affine_roi(w, h, tkres.crop_dst, tkres.affine_dst);
-        //dump_clbuf("gpu-affine", tkres.affine_dst, w * h, w, h, 0, false);
+        dump_clbuf("gpu-affine", tkres.affine_dst, w * h, w, h, 0, false);
 
         preproc(tkres.affine_dst, tkres.cos2d, tkres.proc_dst, w, h);
-        //dump_clbuf("gpu-preproc", tkres.proc_dst, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
+        dump_clbuf("gpu-preproc", tkres.proc_dst, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
 
         // GPU FFT for proc_dst
         resFFT = gpu_fft(tkres.proc_dst, tkres.F, w, h, false);
         printf("INFO: gpu_fft return = %d\n", resFFT);
-        //dump_clbuf("gpu-fft-F", G, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
+        dump_clbuf("gpu-F", tkres.F, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
 
         // initialize filter
         train_filter(tkres.G, tkres.F, tkres.H1, tkres.H2, w, h);
     }
 
-    dump_clbuf("gpu-init-H1", tkres.H1, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
-    dump_clbuf("gpu-init-H2", tkres.H2, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
+    dump_clbuf("gpu-H1", tkres.H1, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
+    dump_clbuf("gpu-H2", tkres.H2, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
 }
 
 void track_update(const ROI& roi, char* srcbuf, int srcw, int srch, int index)
@@ -706,18 +707,20 @@ void track_update(const ROI& roi, char* srcbuf, int srcw, int srch, int index)
     int y = roi.y;
 
     crop_roi(srcbuf, srcw, srch, w, h, x, y, tkres.crop_dst);
-    //dump_clbuf("gpu-roi", tkres.crop_dst, w * h, w, h, index, false);
+    dump_clbuf("gpu-roi", tkres.crop_dst, w * h, w, h, index, false);
 
     preproc(tkres.crop_dst, tkres.cos2d, tkres.proc_dst, w, h);
+    dump_clbuf("gpu-preproc", tkres.proc_dst, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
 
     resFFT = gpu_fft(tkres.proc_dst, tkres.F, w, h, false);
     if (resFFT != VKFFT_SUCCESS) {
         printf("ERROR: gpu_fft failed with return = %d exit...\n", resFFT);
         exit(1);
     }
-    
-    correlate(tkres.G, tkres.F, tkres.H1, tkres.H2, tkres.R, w, h);
-    dump_clbuf("gpu-fft-C", tkres.R, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
+    dump_clbuf("gpu-F", tkres.F, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
+
+    gpu_correlate(tkres.G, tkres.F, tkres.H1, tkres.H2, tkres.R, w, h);
+    dump_clbuf("gpu-fft-R", tkres.R, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
 }
 
 void track_destroy()

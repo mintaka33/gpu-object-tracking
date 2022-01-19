@@ -8,11 +8,6 @@ __kernel void hanning(__global double *out, int m) {
   int i = get_global_id(0);
   int size = get_global_size(0);
 
-#if KERNEL_LOG
-  if (i == 0)
-    printf("kernel_log:hanning: size = %d, m = %d\n", size, m);
-#endif
-
   out[i] = 0.5 - 0.5 * cos(2 * PI * i / (m - 1));
 }
 
@@ -20,15 +15,7 @@ __kernel void cosine2d(__global double *cos2d, __global double *cosw,
                        __global double *cosh, int w, int h) {
   int x = get_global_id(0);
   int y = get_global_id(1);
-  int size_x = get_global_size(0);
-  int size_y = get_global_size(1);
   int i = y * w + x;
-
-#if KERNEL_LOG
-  if (x == 0 && y == 0)
-    printf("kernel_log:cosine2d: size_x = %d, size_y = %d, w = %d, h = %d\n",
-           size_x, size_y, w, h);
-#endif
 
   cos2d[i] = sqrt(cosw[x] * cosh[y]);
 }
@@ -36,37 +23,24 @@ __kernel void cosine2d(__global double *cos2d, __global double *cosw,
 __kernel void gauss2d(__global double *guass, int w, int h) {
   int x = get_global_id(0);
   int y = get_global_id(1);
-  int size_x = get_global_size(0);
-  int size_y = get_global_size(1);
 
-#if KERNEL_LOG
-  if (x == 0 && y == 0)
-    printf("kernel_log:gauss2d: size_x = %d, size_y = %d, w = %d, h = %d\n",
-           size_x, size_y, w, h);
-#endif
-
-  double hw = ((double)w) / 2;
-  double hh = ((double)h) / 2;
+  double hw = ((double)w) / 2.0;
+  double hh = ((double)h) / 2.0;
   double dx = (double)x - hw;
   double dy = (double)y - hh;
   double ep = (dx * dx + dy * dy) / ((double)(SIGMA * SIGMA));
 
+  if (x <= 0 && y <= 0)
+    printf("**** kernel-log: w = %d, h = %d\n", w, h);
+
   guass[y * w * 2 + 2 * x] = exp(-0.5 * ep);     // real part
-  guass[y * w * 2 + 2 * x + 1] = exp(-0.5 * ep); // imaginary  part
+  guass[y * w * 2 + 2 * x + 1] = 0; // imaginary  part
 }
 
 __kernel void logf(__global uchar *src, __global double *dst, int w, int h) {
   int x = get_global_id(0);
   int y = get_global_id(1);
-  int size_x = get_global_size(0);
-  int size_y = get_global_size(1);
   int i = y * w + x;
-
-#if KERNEL_LOG
-  if (x == 0 && y == 0)
-    printf("kernel_log:logf: size_x = %d, size_y = %d, w = %d, h = %d\n",
-           size_x, size_y, w, h);
-#endif
 
   dst[i] = log((double)src[i] / 255.0);
 }
@@ -75,14 +49,6 @@ __kernel void crop(__global uchar *src, __global uchar *dst, int srcw, int srch,
                    int offset_x, int offset_y, int dstw, int dsth) {
   int x = get_global_id(0);
   int y = get_global_id(1);
-  int size_x = get_global_size(0);
-  int size_y = get_global_size(1);
-
-#if KERNEL_LOG
-  if (x == 0 && y == 0)
-    printf("kernel_log:crop: size_x = %d, size_y = %d, w = %d, h = %d\n",
-           size_x, size_y, dstw, dsth);
-#endif
 
   dst[y * dstw + x] = src[srcw * (offset_y + y) + offset_x + x];
 }
@@ -91,17 +57,6 @@ __kernel void affine(__global uchar *src, __global uchar *dst,
                      __global double *mat, int w, int h) {
   int i = get_global_id(0);
   int j = get_global_id(1);
-  int size_x = get_global_size(0);
-  int size_y = get_global_size(1);
-
-#if KERNEL_LOG
-  if (i == 0 && j == 0) {
-    printf("kernel_log:affine: size_x = %d, size_y = %d, w = %d, h = %d\n",
-           size_x, size_y, w, h);
-    printf("kernel_log:affine: matrix = \n %f, %f, %f, \n %f, %f, %f\n", mat[0],
-           mat[1], mat[2], mat[3], mat[4], mat[5]);
-  }
-#endif
 
   double yp = 0;
   double x1, y1, x2, y2, x, y;
@@ -140,64 +95,11 @@ __kernel void affine(__global uchar *src, __global uchar *dst,
   dst[(j * w + i)] = p;
 }
 
-__kernel void preproc_sum(__global uchar *src, int w, int h,
-                          __global int *sum) {
-  int x = get_global_id(0);
-  int y = get_global_id(1);
-  int size_x = get_global_size(0);
-  int size_y = get_global_size(1);
-
-#if KERNEL_LOG
-  if (x == 0 && y == 0) {
-    printf("kernel_log:preproc_sum: size_x = %d, size_y = %d, w = %d, h = %d\n",
-           size_x, size_y, w, h);
-  }
-#endif
-
-  // the mimic of atomic_add_float is too costly to use
-  // atomic_add_f32(sum, log((float)(src[y*w+x])));
-
-  // use build-in atomic_add int, there might be loss due to rounding float to
-  // int
-  float a = log((float)src[y * w + x]);
-  atomic_add(sum, (int)round(a));
-}
-
-__kernel void preproc_std(__global uchar *src, __global int *log_sum, int w,
-                          int h, __global int *std_sum) {
-  int x = get_global_id(0);
-  int y = get_global_id(1);
-  int size_x = get_global_size(0);
-  int size_y = get_global_size(1);
-
-#if KERNEL_LOG
-  if (x == 0 && y == 0) {
-    printf("kernel_log:preproc_std: size_x = %d, size_y = %d, w = %d, h = %d\n",
-           size_x, size_y, w, h);
-    printf("kernel avg = %f\n", (float)(log_sum[0]) / (w * h));
-  }
-#endif
-
-  float avg = (float)(log_sum[0]) / (w * h);
-  float a = log((float)src[y * w + x]);
-  float b = (a - avg) * (a - avg);
-  atomic_add(std_sum, (int)round(b));
-}
-
 __kernel void preproc(__global uchar *src, __global double *cos2d,
                       __global double *dst, float avg, float std, int w,
                       int h) {
   int x = get_global_id(0);
   int y = get_global_id(1);
-  int size_x = get_global_size(0);
-  int size_y = get_global_size(1);
-
-#if KERNEL_LOG
-  if (x == 0 && y == 0) {
-    printf("kernel_log:preproc_std: size_x = %d, size_y = %d, w = %d, h = %d\n",
-           size_x, size_y, w, h);
-  }
-#endif
 
   double eps = 0.00001;
   double a = log((float)src[y * w + x]/255.0); // nornalization
@@ -209,15 +111,6 @@ __kernel void calcH(__global double *G, __global double *F, __global double *H1,
                     __global double *H2, int w, int h) {
   int i = get_global_id(0);
   int j = get_global_id(1);
-  int size_x = get_global_size(0);
-  int size_y = get_global_size(1);
-
-#if KERNEL_LOG
-  if (i == 0 && j == 0) {
-    printf("kernel_log:initfilter: size_x = %d, size_y = %d, w = %d, h = %d\n",
-           size_x, size_y, w, h);
-  }
-#endif
 
   // H1 += G * np.conj(Fi)
   // H2 += Fi * np.conj(Fi)
