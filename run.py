@@ -1,10 +1,11 @@
 import os
 import numpy as np
 import cv2
+import glob
 
 w, h = 517, 421
 app_name = 'gpu_math.exe'
-app_dir = 'C:\\data\\work\\gpu_tracking\\gpu-object-tracking\\build\\bin'
+app_dir = 'D:\\Code\\gpu_tracking\\gpu-object-tracking\\build\\bin'
 roi_file = '%s\\dump.gpu-roi.0001.517x421.yuv'%app_dir
 aff_file = '%s\\dump.gpu-affine.0001.517x421.yuv'%app_dir
 proc_file = '%s\\dump.0000.gpu-preproc.1034x421.txt'%app_dir
@@ -74,9 +75,16 @@ def verify_preproc():
     np.savetxt('%s\\ref.proc.txt'%app_dir, ref, fmt='%-14.6f', delimiter=', ')
     print('proc-diff = %f' % np.sum(np.abs(ref -gpu_proc)))
 
+def yuv_to_image():
+    for yuvfile in glob.glob('%s\\dump.*.yuv'%app_dir):
+        imgfile = '%s.bmp' % yuvfile
+        data = np.fromfile(yuvfile, dtype=np.uint8, count=w*h).reshape((h, w))
+        cv2.imwrite(imgfile, data)
+
 def find_max():
     pass
 
+yuv_to_image()
 # verify_affine()
 # verify_fft()
 # verify_preproc()

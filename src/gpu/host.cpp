@@ -560,7 +560,7 @@ void preproc(cl_mem clsrc, cl_mem cos2d, cl_mem cldst, int w, int h)
 
 void train_filter(cl_mem G, cl_mem F, cl_mem H1, cl_mem H2, int w, int h)
 {
-    cl_kernel kernel_train  = clCreateKernel(program, "calcH", &err);
+    cl_kernel kernel_train  = clCreateKernel(program, "calc_filter", &err);
     CL_CHECK_ERROR(err, "clCreateKernel");
 
     err = clSetKernelArg(kernel_train, 0, sizeof(cl_mem), &G);

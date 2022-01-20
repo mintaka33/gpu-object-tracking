@@ -107,7 +107,7 @@ __kernel void preproc(__global uchar *src, __global double *cos2d,
   dst[y * w * 2 + x * 2 + 1] = 0;
 }
 
-__kernel void calcH(__global double *G, __global double *F, __global double *H1,
+__kernel void calc_filter(__global double *G, __global double *F, __global double *H1,
                     __global double *H2, int w, int h) {
   int i = get_global_id(0);
   int j = get_global_id(1);
@@ -119,11 +119,11 @@ __kernel void calcH(__global double *G, __global double *F, __global double *H1,
   double c = F[j * w * 2 + i * 2 + 0];
   double d = F[j * w * 2 + i * 2 + 1];
   // (a+bi)*(c-di) = (ac + bd) + (bc-ad)i
-  H1[j * w * 2 + i * 2 + 0] += a * c + b * d;
-  H1[j * w * 2 + i * 2 + 1] += b * c - a * d;
+  H1[j * w * 2 + i * 2 + 0] += (a * c + b * d);
+  H1[j * w * 2 + i * 2 + 1] += (b * c - a * d);
   // (c+di)*(c-di) = (cc+dd)i
-  H2[j * w * 2 + i * 2 + 0] += c * c + d * d;
-  H2[j * w * 2 + i * 2 + 1] += 0;
+  H2[j * w * 2 + i * 2 + 0] += (c * c + d * d);
+  H2[j * w * 2 + i * 2 + 1] = 0;
 }
 
 __kernel void correlate(__global double *G, __global double *F,
