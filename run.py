@@ -10,6 +10,7 @@ roi_file = '%s\\dump.gpu-roi.0001.517x421.yuv'%app_dir
 aff_file = '%s\\dump.gpu-affine.0001.517x421.yuv'%app_dir
 proc_file = '%s\\dump.0000.gpu-preproc.1034x421.txt'%app_dir
 cos2d_file = '%s\\dump.0000.gpu-cos2d.517x421.txt'%app_dir
+R_file = '%s\\dump.0000.gpu-r.1034x421.txt'%app_dir
 
 def execute(cmd):
     print('#'*8, cmd)
@@ -82,12 +83,16 @@ def yuv_to_image():
         cv2.imwrite(imgfile, data)
 
 def find_max():
-    pass
+    r = np.genfromtxt(R_file, dtype=float, delimiter=',')
+    r = r[:, 0::2]
+    idx = np.unravel_index(r.argmax(), r.shape)
+    print(idx)
 
-yuv_to_image()
+# yuv_to_image()
 # verify_affine()
 # verify_fft()
 # verify_preproc()
+
 find_max()
 
 print('done')

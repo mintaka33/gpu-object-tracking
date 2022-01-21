@@ -44,7 +44,7 @@ typedef struct _TrackRes {
     cl_mem affine_dst;
     cl_mem proc_dst;
     cl_mem cos2d;
-    cl_mem G, F, H1, H2, R;
+    cl_mem G, F, H1, H2, R, r;
 } TrackRes;
 
 static TrackRes tkres = {};
@@ -319,7 +319,7 @@ void gpu_affine(cl_mem clsrc, cl_mem cldst, int w, int h, double m[2][3])
     clReleaseKernel(kernel);
 }
 
-VkFFTResult gpu_fft(cl_mem clinbuffer, cl_mem clbuffer, int w, int h, bool r2c)
+VkFFTResult gpu_fft(cl_mem clinbuffer, cl_mem clbuffer, int w, int h, bool r2c, bool inverse)
 {
     cl_int res = CL_SUCCESS;
     //zero-initialize configuration + FFT application
@@ -367,7 +367,7 @@ VkFFTResult gpu_fft(cl_mem clinbuffer, cl_mem clbuffer, int w, int h, bool r2c)
     launchParams.commandQueue = &queue;
 
     // FFT
-    resFFT = VkFFTAppend(&app, -1, &launchParams);
+    resFFT = VkFFTAppend(&app, ((inverse)? 1 : -1), &launchParams);
     if (resFFT != VKFFT_SUCCESS) {
         printf("ERROR: FFT failed with resFFT = %d\n", resFFT);
         return resFFT;
@@ -493,7 +493,7 @@ void test_gpu_fft(int w, int h)
 
     // execute GPU FFT
     printf("gpu-fft: width = %d, height = %d\n", w, h);
-    resFFT = gpu_fft(clinbuffer, clbuffer, w, h, true);
+    resFFT = gpu_fft(clinbuffer, clbuffer, w, h, false, false);
     printf("resFFT = % d\n", resFFT);
     dump_clbuf("gpu-fft", clbuffer, bufferSize, w, h, 0, true);
 
@@ -646,6 +646,9 @@ void track_alloc(int w, int h)
 
     tkres.R = clCreateBuffer(context, CL_MEM_READ_WRITE, fft_size, 0, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
+
+    tkres.r = clCreateBuffer(context, CL_MEM_READ_WRITE, fft_size, 0, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
 }
 
 void track_init(const ROI& roi, char* srcbuf, int srcw, int srch)
@@ -666,7 +669,7 @@ void track_init(const ROI& roi, char* srcbuf, int srcw, int srch)
     dump_clbuf("gpu-gauss2d", tkres.guass2d, sizeof(double) * w * h, w, h, 0, true);
 
     // GPU FFT for guass2d
-    resFFT = gpu_fft(tkres.guass2d, tkres.G, w, h, false);
+    resFFT = gpu_fft(tkres.guass2d, tkres.G, w, h, false, false);
     printf("INFO: gpu_fft return = %d\n", resFFT);
     dump_clbuf("gpu-G", tkres.G, sizeof(double) * 2 * w * h, 2*w, h, 0, true);
 
@@ -685,7 +688,7 @@ void track_init(const ROI& roi, char* srcbuf, int srcw, int srch)
         dump_clbuf("gpu-preproc", tkres.proc_dst, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
 
         // GPU FFT for proc_dst
-        resFFT = gpu_fft(tkres.proc_dst, tkres.F, w, h, false);
+        resFFT = gpu_fft(tkres.proc_dst, tkres.F, w, h, false, false);
         printf("INFO: gpu_fft return = %d\n", resFFT);
         dump_clbuf("gpu-F", tkres.F, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
 
@@ -712,7 +715,7 @@ void track_update(const ROI& roi, char* srcbuf, int srcw, int srch, int index)
     preproc(tkres.crop_dst, tkres.cos2d, tkres.proc_dst, w, h);
     dump_clbuf("gpu-preproc", tkres.proc_dst, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
 
-    resFFT = gpu_fft(tkres.proc_dst, tkres.F, w, h, false);
+    resFFT = gpu_fft(tkres.proc_dst, tkres.F, w, h, false, false);
     if (resFFT != VKFFT_SUCCESS) {
         printf("ERROR: gpu_fft failed with return = %d exit...\n", resFFT);
         exit(1);
@@ -721,6 +724,14 @@ void track_update(const ROI& roi, char* srcbuf, int srcw, int srch, int index)
 
     gpu_correlate(tkres.G, tkres.F, tkres.H1, tkres.H2, tkres.R, w, h);
     dump_clbuf("gpu-fft-R", tkres.R, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
+
+    // inverse FFT
+    resFFT = gpu_fft(tkres.R, tkres.r, w, h, false, true);
+    if (resFFT != VKFFT_SUCCESS) {
+        printf("ERROR: gpu_fft failed with return = %d exit...\n", resFFT);
+        exit(1);
+    }
+    dump_clbuf("gpu-r", tkres.r, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
 }
 
 void track_destroy()
@@ -735,6 +746,7 @@ void track_destroy()
     clReleaseMemObject(tkres.H1);
     clReleaseMemObject(tkres.H2);
     clReleaseMemObject(tkres.R);
+    clReleaseMemObject(tkres.r);
 }
 
 void parse_arg(int argc, char** argv)
