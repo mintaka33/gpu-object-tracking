@@ -46,7 +46,7 @@ void dump2text(char* tag, double* data, const int w, const int h, int i)
     char tmp[64] = {};
     for (size_t y = 0; y < h; y++) {
         for (size_t x = 0; x < w; x++) {
-            sprintf_s(tmp, "%14.6f", data[x + w * y]);
+            sprintf_s(tmp, "%e", data[x + w * y]);
             of << tmp << ", ";
         }
         of << std::endl;

@@ -124,7 +124,7 @@ void print_perf()
 
 void get_frame(char* buf, int size, int index=0)
 {
-    string yuvfile = "..\\..\\test.yuv";
+    string yuvfile = "test.yuv";
     ifstream infile;
     infile.open(yuvfile.c_str(), ios::binary);
     if (!infile.is_open()) {
@@ -678,7 +678,7 @@ void track_init(const ROI& roi, char* srcbuf, int srcw, int srch)
     dump_clbuf("gpu-roi", tkres.crop_dst, w * h, w, h, 0, false);
 
     // train filter template 
-    for (size_t i = 0; i < 1; i++)
+    for (size_t i = 0; i < 8; i++)
     {
         // do affine transformation for the ROI region
         affine_roi(w, h, tkres.crop_dst, tkres.affine_dst);
@@ -732,6 +732,27 @@ void track_update(const ROI& roi, char* srcbuf, int srcw, int srch, int index)
         exit(1);
     }
     dump_clbuf("gpu-r", tkres.r, sizeof(double) * 2 * w * h, 2 * w, h, 0, true);
+
+    vector<double> r(w*2*h, 0);
+    res = clEnqueueReadBuffer(queue, tkres.r, CL_TRUE, 0, sizeof(double) * w * 2 * h, r.data(), 0, NULL, NULL);
+    CL_CHECK_ERROR(err, "clEnqueueWriteBuffer");
+    clFinish(queue);
+
+    // find peak value position
+    int mx = 0, my = 0;
+    double max = r[0];
+    for (size_t j = 0; j < h; j++) {
+        for (size_t i = 0; i < w * 2; i += 2) {
+            if (r[j * w * 2 + i] > max){
+                max = r[j * w * 2 + i];
+                mx = i/2;
+                my = j;
+            }
+        }
+    }
+    int dx = (int)round((double)mx - ((double)w) / 2);
+    int dy = (int)round((double)my - ((double)h) / 2);
+    printf("INFO: mx = %d, my = %d, dx = %d, dy = %d\n", mx, my, dx, dy);
 }
 
 void track_destroy()
