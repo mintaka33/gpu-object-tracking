@@ -616,7 +616,7 @@ void track_alloc(int w, int h)
 {
     int fft_size = sizeof(double) * w * 2 * h; // complex number
 
-    tkres.guass2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * w * h, nullptr, &err);
+    tkres.guass2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * w * 2 * h, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
 
     tkres.cos2d = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * w * h, nullptr, &err);
@@ -666,7 +666,7 @@ void track_init(const ROI& roi, char* srcbuf, int srcw, int srch)
 
     // generate gauss distribution
     gpu_gauss2d(w, h, tkres.guass2d);
-    dump_clbuf("gpu-gauss2d", tkres.guass2d, sizeof(double) * w * h, w, h, 0, true);
+    dump_clbuf("gpu-gauss2d", tkres.guass2d, sizeof(double) * w * 2 * h, w * 2, h, 0, true);
 
     // GPU FFT for guass2d
     resFFT = gpu_fft(tkres.guass2d, tkres.G, w, h, false, false);

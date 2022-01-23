@@ -25,7 +25,7 @@ int main()
 
     char *frame = nullptr;
     size_t picW = 1920, picH = 1080;
-    RoiRect ri = { 11, 622, 504, 364 };
+    RoiRect ri = { 6, 599, 517, 421 };
 
     Mosse tracker;
 
@@ -49,9 +49,9 @@ int main()
 #endif
 
     tracker.init(frame, picW, picH, ri);
-    //tracker.dump2txt();
+    tracker.dump2txt();
 
-    for (size_t i = 2; i <= 256; i++) {
+    for (size_t i = 2; i <= 2; i++) {
 #ifdef USE_OPENCV
         cap >> rawMat;
         if (rawMat.empty()) {

@@ -119,6 +119,7 @@ def main():
 
         if init_bb is None:
             init_bb = cv2.selectROI("Frame", frame, fromCenter=False, showCrosshair=True)
+            init_bb = [6, 599, 517, 421] # use fixed rect for debugging
             x, y, w, h = init_bb[0], init_bb[1], init_bb[2], init_bb[3]
             if tracker is None:
                 tracker = MOSSE(frame_gray, (x, y, x+w, y+h))

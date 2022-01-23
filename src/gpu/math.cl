@@ -1,5 +1,5 @@
 
-#define PI 3.1415926
+#define PI 3.14159265
 #define SIGMA 2.0
 
 #define KERNEL_LOG 1
@@ -28,10 +28,7 @@ __kernel void gauss2d(__global double *guass, int w, int h) {
   double hh = ((double)h) / 2.0;
   double dx = (double)x - hw;
   double dy = (double)y - hh;
-  double ep = (dx * dx + dy * dy) / ((double)(SIGMA * SIGMA));
-
-  if (x <= 0 && y <= 0)
-    printf("**** kernel-log: w = %d, h = %d\n", w, h);
+  double ep = (dx * dx + dy * dy) / (((double)SIGMA * (double)SIGMA));
 
   guass[y * w * 2 + 2 * x] = exp(-0.5 * ep);     // real part
   guass[y * w * 2 + 2 * x + 1] = 0; // imaginary  part
