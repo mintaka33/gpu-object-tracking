@@ -28,15 +28,22 @@ def verify_affine():
 def verify_fft():
     def dump_result(data, tag):
         filename = '%s\\dump_%s_%dx%d.txt' % (app_dir, tag, data.shape[1], data.shape[0])
-        np.savetxt(filename, data, fmt='%-14f', delimiter=', ')
+        np.savetxt(filename, data, fmt='%-15f', delimiter=', ')
     def gaussian2(w, h, sigma=2.0):
         xs, ys = np.meshgrid(np.arange(w), np.arange(h))
         center_x, center_y = w / 2, h / 2
         dist = ((xs - center_x) ** 2 + (ys - center_y) ** 2) / (sigma**2)
         g = np.exp(-0.5*dist).astype(np.float64)
         return g
-    def numpy_fft(w, h):
-        g = gaussian2(w, h)
+    def get_input(w, h):
+        filename = 'dump.0000.input.%dx%d.txt' % (w, h)
+        data = np.genfromtxt('%s\\%s'%(app_dir, filename), dtype=np.float64, delimiter=",")
+        data = data[::, :-1:]
+        return data.reshape((h, w))
+    def ref_fft(w, h):
+        g = get_input(w, h) # gaussian2(w, h)
+        dump_result(g, 'input')
+        # G = cv2.dft(g, flags = cv2.DFT_COMPLEX_OUTPUT)
         G = np.fft.fft2(g)
         result = np.zeros((h, w*2), dtype=np.float64)
         result[:, 0::2] = G.real
@@ -45,15 +52,19 @@ def verify_fft():
     def gpu_fft(w, h):
         cmd = 'cd %s && %s' % (app_dir, app_name)
         execute(cmd)
-        result = np.genfromtxt('%s\\result.txt'%app_dir, dtype=np.float64, delimiter=",")
+        filename = 'dump.0000.gpu-fft.%dx%d.txt' % (w*2, h)
+        result = np.genfromtxt('%s\\%s'%(app_dir, filename), dtype=np.float64, delimiter=",")
+        result = result[::, :-1:]
         # r, i = result[:, 0::2], result[:, 1::2]
-        return result[:, :-1]
-    
-    ref = numpy_fft(w, h)
-    dump_result(ref, 'ref')
+        return result
+
+    w, h = 16, 16
     gpu = gpu_fft(w, h)
     dump_result(gpu, 'gpu')
-    print('INFO: [%dx%d] sum of delta = %f, max = %f' % (w, h, np.sum(np.abs(ref - gpu)), np.max(np.abs(ref - gpu))))
+    ref = ref_fft(w, h)
+    dump_result(ref, 'ref')
+
+    # print('INFO: [%dx%d] sum of delta = %f, max = %f' % (w, h, np.sum(np.abs(ref - gpu)), np.max(np.abs(ref - gpu))))
 
 def verify_preproc():
     # gpu result
@@ -90,9 +101,9 @@ def find_max():
 
 # yuv_to_image()
 # verify_affine()
-# verify_fft()
+verify_fft()
 # verify_preproc()
 
-find_max()
+# find_max()
 
 print('done')

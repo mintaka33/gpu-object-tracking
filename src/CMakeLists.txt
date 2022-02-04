@@ -13,8 +13,8 @@ target_link_libraries(gpu_math OpenCL)
 
 set_target_properties(gpu_math PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin/$<0:>)
 
-file(GLOB OPENCL_KERNEL_FILES "${CMAKE_CURRENT_LIST_DIR}/gpu/*.cl")
-file(COPY ${OPENCL_KERNEL_FILES} DESTINATION ${PROJECT_BINARY_DIR}/bin)
+# file(GLOB OPENCL_KERNEL_FILES "${CMAKE_CURRENT_LIST_DIR}/gpu/*.cl")
+# file(COPY ${OPENCL_KERNEL_FILES} DESTINATION ${PROJECT_BINARY_DIR}/bin)
 
 project(mosse)
 

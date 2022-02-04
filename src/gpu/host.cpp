@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <fstream>
+#include <random>
 
 #include <CL/cl.h>
 
@@ -134,6 +135,18 @@ void get_frame(char* buf, int size, int index=0)
     infile.seekg(size * index);
     infile.read(buf, size);
     infile.close();
+}
+
+void gen_input(double* input, int w, int h)
+{
+    default_random_engine generator;
+    uniform_real_distribution<double> distribution(0.0, 1.0);
+
+    for (int i = 0; i < w*h; i+=1) {
+        input[i] = distribution(generator);
+    }
+
+    dump2text("input", (double*)input, w, h, 0);
 }
 
 void dump_clbuf(char* tag, cl_mem clbuffer, uint64_t size, int w, int h, int i, bool istext)
@@ -474,11 +487,15 @@ void test_gpu_fft(int w, int h)
     uint64_t inputBufferSize = sizeof(double) * 2 * num_items;
     uint64_t outputBufferSize = sizeof(double) * 2 * num_items;
     uint64_t bufferSize = sizeof(double) * 2 * num_items; 
+    vector<double> input(num_items, 0);
     vector<double> indata(2 * num_items, 0);
     vector<double> outdata(2 * num_items, 0);
-    for (size_t i = 0; i < 2 * num_items; i += 2) {
-        indata[i] = i;
+
+    gen_input((double*)input.data(), w, h);
+    for (size_t i = 0; i < num_items; i += 1) {
+        indata[i*2] = input[i]; // assign real part only
     }
+    dump2text("indata", (double*)indata.data(), w*2, h, 0);
 
     // input buffer in device
     cl_mem clinbuffer = clCreateBuffer(context, CL_MEM_READ_WRITE, inputBufferSize, 0, &res);
@@ -495,7 +512,7 @@ void test_gpu_fft(int w, int h)
     printf("gpu-fft: width = %d, height = %d\n", w, h);
     resFFT = gpu_fft(clinbuffer, clbuffer, w, h, false, false);
     printf("resFFT = % d\n", resFFT);
-    dump_clbuf("gpu-fft", clbuffer, bufferSize, w, h, 0, true);
+    dump_clbuf("gpu-fft", clbuffer, bufferSize, w*2, h, 0, true);
 
     clReleaseMemObject(clbuffer);
     clReleaseMemObject(clinbuffer);
@@ -678,7 +695,7 @@ void track_init(const ROI& roi, char* srcbuf, int srcw, int srch)
     dump_clbuf("gpu-roi", tkres.crop_dst, w * h, w, h, 0, false);
 
     // train filter template 
-    for (size_t i = 0; i < 8; i++)
+    for (size_t i = 0; i < 1; i++)
     {
         // do affine transformation for the ROI region
         affine_roi(w, h, tkres.crop_dst, tkres.affine_dst);
@@ -805,12 +822,13 @@ int main(int argc, char** argv)
 
     ocl_init();
 
+#if 1
     //test_gpu_cos2d(roi.width, roi.height);
     //test_gpu_gauss2d(roi.width, roi.height);
     //test_gpu_preproc(roi.width, roi.height);
     //test_gpu_affine(roi.x, roi.y, roi.width, roi.height);
-    //test_gpu_fft(roi.width, roi.height);
-
+    test_gpu_fft(16, 16);
+#else
     track_alloc(roi.width, roi.height);
 
     vector<char> inbuf(srcw * srch, 0);
@@ -822,6 +840,7 @@ int main(int argc, char** argv)
     track_update(roi, (char*)inbuf.data(), srcw, srch, index);
 
     track_destroy();
+#endif
 
     ocl_destroy();
     return 0;
