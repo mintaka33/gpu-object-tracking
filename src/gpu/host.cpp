@@ -804,8 +804,10 @@ void parse_arg(int argc, char** argv)
         roi.height = atoi(argv[2]);
         break;
     case 5:
-        roi.width = atoi(argv[1]);
-        roi.height = atoi(argv[2]);
+        roi.x = atoi(argv[1]);
+        roi.y = atoi(argv[2]);
+        roi.width = atoi(argv[3]);
+        roi.height = atoi(argv[4]);
         break;
     default:
         printf("ERROR: invalid command line! exit\n");
@@ -827,7 +829,7 @@ int main(int argc, char** argv)
     //test_gpu_gauss2d(roi.width, roi.height);
     //test_gpu_preproc(roi.width, roi.height);
     //test_gpu_affine(roi.x, roi.y, roi.width, roi.height);
-    test_gpu_fft(16, 16);
+    test_gpu_fft(roi.width, roi.height);
 #else
     track_alloc(roi.width, roi.height);
 

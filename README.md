@@ -3,5 +3,5 @@
 ```bash
 mkdir build
 cd build
-cmake ../src -DOpenCV_DIR=D:/Data/data2/code/opencv/build
+cmake ../src -DOpenCV_DIR=D:/Code/opencv-4.5.5/build/install
 ```

@@ -28,7 +28,7 @@ def verify_affine():
 def verify_fft():
     def dump_result(data, tag):
         filename = '%s\\dump_%s_%dx%d.txt' % (app_dir, tag, data.shape[1], data.shape[0])
-        np.savetxt(filename, data, fmt='%-15f', delimiter=', ')
+        np.savetxt(filename, data, fmt='%+.18e', delimiter=', ')
     def gaussian2(w, h, sigma=2.0):
         xs, ys = np.meshgrid(np.arange(w), np.arange(h))
         center_x, center_y = w / 2, h / 2
@@ -50,7 +50,8 @@ def verify_fft():
         result[:, 1::2] = G.imag
         return result
     def gpu_fft(w, h):
-        cmd = 'cd %s && %s' % (app_dir, app_name)
+        app_cmd = '%s %d %d' % (app_name, w, h)
+        cmd = 'cd %s && %s' % (app_dir, app_cmd)
         execute(cmd)
         filename = 'dump.0000.gpu-fft.%dx%d.txt' % (w*2, h)
         result = np.genfromtxt('%s\\%s'%(app_dir, filename), dtype=np.float64, delimiter=",")
@@ -58,7 +59,7 @@ def verify_fft():
         # r, i = result[:, 0::2], result[:, 1::2]
         return result
 
-    w, h = 16, 16
+    w, h = 53, 31
     gpu = gpu_fft(w, h)
     dump_result(gpu, 'gpu')
     ref = ref_fft(w, h)
