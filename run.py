@@ -3,11 +3,13 @@ import numpy as np
 import cv2
 import glob
 
-w, h = 517, 421
+srcw, srch = 1920, 1080
+x, y, w, h = 6, 599, 517, 421
 app_name = 'gpu_math.exe'
 app_dir = 'D:\\Code\\gpu_tracking\\gpu-object-tracking\\build\\bin'
-roi_file = '%s\\dump.gpu-roi.0001.517x421.yuv'%app_dir
-aff_file = '%s\\dump.gpu-affine.0001.517x421.yuv'%app_dir
+yuv_file = '%s\\test.yuv'%app_dir
+roi_file = '%s\\dump.gpu-roi.0000.517x421.yuv'%app_dir
+aff_file = '%s\\dump.gpu-affine.0000.517x421.yuv'%app_dir
 proc_file = '%s\\dump.0000.gpu-preproc.1034x421.txt'%app_dir
 cos2d_file = '%s\\dump.0000.gpu-cos2d.517x421.txt'%app_dir
 R_file = '%s\\dump.0000.gpu-r.1034x421.txt'%app_dir
@@ -17,13 +19,19 @@ def execute(cmd):
     os.system(cmd)
 
 def verify_affine():
+    # gpu result
     cmd = 'cd %s && %s' % (app_dir, app_name)
-    # execute(cmd)
-
+    execute(cmd)
     frame = np.fromfile(roi_file, dtype=np.uint8, count=w*h).reshape((h, w))
     cv2.imwrite('%s\\roi.bmp' % app_dir, frame)
     frame = np.fromfile(aff_file, dtype=np.uint8, count=w*h).reshape((h, w))
     cv2.imwrite('%s\\aff.bmp' % app_dir, frame)
+    # ref result
+    yuv = np.fromfile(yuv_file, dtype=np.uint8, count=srcw*srch).reshape((srch, srcw))
+    a = yuv[y:y+h, x:x+w]
+    T = np.array([[1.021916, -0.021326, -1.176091], [0.039830, 0.923501, 5.806976]])
+    b = cv2.warpAffine(a, T, (w, h), flags = cv2.INTER_LINEAR, borderMode = cv2.BORDER_REFLECT)
+    cv2.imwrite('%s\\ref.bmp'%app_dir, b)
 
 def verify_fft():
     def dump_result(data, tag):
@@ -101,8 +109,8 @@ def find_max():
     print(idx)
 
 # yuv_to_image()
-# verify_affine()
-verify_fft()
+verify_affine()
+# verify_fft()
 # verify_preproc()
 
 # find_max()

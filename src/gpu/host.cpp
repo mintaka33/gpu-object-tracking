@@ -446,8 +446,8 @@ void crop_roi(char* srcbuf, int srcw, int srch, size_t w, size_t h, size_t x, si
 
 void affine_roi(size_t w, size_t h, cl_mem crop_dst, cl_mem affine_dst)
 {
-    double m[2][3] = {};
-    getMatrix(w, h, m[0]);
+    double m[2][3] = { {1.021916, -0.021326, -1.176091}, { 0.039830, 0.923501, 5.806976 } };
+    //getMatrix(w, h, m[0]);
     printf("host matrix = \n %f, %f, %f \n %f, %f, %f \n", m[0][0], m[0][1], m[0][2], m[1][0], m[1][1], m[1][2]);
 
     gpu_affine(crop_dst, affine_dst, w, h, m);
@@ -828,8 +828,8 @@ int main(int argc, char** argv)
     //test_gpu_cos2d(roi.width, roi.height);
     //test_gpu_gauss2d(roi.width, roi.height);
     //test_gpu_preproc(roi.width, roi.height);
-    //test_gpu_affine(roi.x, roi.y, roi.width, roi.height);
-    test_gpu_fft(roi.width, roi.height);
+    test_gpu_affine(roi.x, roi.y, roi.width, roi.height);
+    //test_gpu_fft(roi.width, roi.height);
 #else
     track_alloc(roi.width, roi.height);
 
