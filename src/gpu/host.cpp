@@ -472,6 +472,17 @@ void test_gpu_affine(size_t x, size_t y, size_t w, size_t h)
     crop_roi((char*)inbuf.data(), srcw, srch, w, h, x, y, crop_dst);
     dump_clbuf("gpu-roi", crop_dst, sizeof(char)*w*h, w, h, 0, false);
 
+#if 1
+    vector<char> crop(w*h, 0), affn(w*h, 0);
+    cl_int res = clEnqueueReadBuffer(queue, crop_dst, CL_TRUE, 0, w*h, crop.data(), 0, NULL, NULL);
+    CL_CHECK_ERROR(err, "clEnqueueReadBuffer");
+    clFinish(queue);
+
+    double m[2][3] = { {1.021916, -0.021326, -1.176091}, { 0.039830, 0.923501, 5.806976 } };
+    affine((uint8_t*)crop.data(), w, h, (uint8_t*)affn.data(), w, h, m);
+    dump2yuv("cpu-affine", (uint8_t*)affn.data(), w, h, 0);
+#endif
+
     affine_roi(w, h, crop_dst, affine_dst);
     dump_clbuf("gpu-affine", affine_dst, sizeof(char)*w * h, w, h, 0, false);
 

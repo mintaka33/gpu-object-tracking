@@ -8,7 +8,7 @@ set(OCL_LIB_DIR $ENV{INTELOCLSDKROOT}lib/x64)
 include_directories(${OCL_INCLUDE_DIR})
 link_directories(${OCL_LIB_DIR})
 
-add_executable(gpu_math gpu/host.cpp util.cpp util.h perf.h perf.cpp gpu/vkFFT.h)
+add_executable(gpu_math gpu/host.cpp util.cpp util.h perf.h perf.cpp math.cpp math.h gpu/vkFFT.h)
 target_link_libraries(gpu_math OpenCL)
 
 set_target_properties(gpu_math PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin/$<0:>)
@@ -36,5 +36,6 @@ set_target_properties(mosse PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY
 if(WITH_OPENCV)
 target_link_libraries(test ${OpenCV_LIBS})
 target_link_libraries(mosse ${OpenCV_LIBS})
+target_link_libraries(gpu_math ${OpenCV_LIBS})
 endif()
 

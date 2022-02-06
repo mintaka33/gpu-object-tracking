@@ -102,22 +102,24 @@ void idft2d(const int M, const int N, double* F, double* f)
     PFU_LEAVE;
 }
 
-double bilinear(double q11, double q12, double q21, double q22, double x1, double y1, double x2, double y2, double x, double y)
+uint8_t bilinear(uint8_t q11, uint8_t q12, uint8_t q21, uint8_t q22, double x1, double y1, double x2, double y2, double x, double y)
 {
     double r1, r2, p;
     r1 = (x2 - x) * q11 / (x2 - x1) + (x - x1) * q12 / (x2 - x1);
     r2 = (x2 - x) * q21 / (x2 - x1) + (x - x1) * q22 / (x2 - x1);
     p = (y2 - y) * r1 / (y2 - y1) + (y - y1) * r2 / (y2 - y1);
-    return p;
+    if (p > 255) return 255;
+    if (p < 0) return 0;
+    return uint8_t(p);
 }
 
-void affine(double* src, int sw, int sh, double* dst, int dw, int dh, double m[2][3])
+void affine(uint8_t* src, int sw, int sh, uint8_t* dst, int dw, int dh, double m[2][3])
 {
     for (int j = 0; j < dh; j++) {
         for (int i = 0; i < dw; i++) {
-            double yp = 0;
+            uint8_t yp = 0;
+            uint8_t q11, q12, q21, q22;
             double x1, y1, x2, y2, x, y;
-            double q11[3], q12[3], q21[3], q22[3];
             int x1i, y1i, x2i, y2i;
 
             x = m[0][0] * i + m[0][1] * j + m[0][2] * 1;
@@ -137,15 +139,15 @@ void affine(double* src, int sw, int sh, double* dst, int dw, int dh, double m[2
             x2 = x1 + 1; x2i = (int)x2;
             y2 = y1 + 1; y2i = (int)y2;
 
-            dst[(y1i * dw + x1i)] = src[j * dw + i];
+            //dst[(y1i * dw + x1i)] = src[j * dw + i];
 
-            //q11[0] = src[(y1i * sw + x1i)];
-            //q12[0] = src[(y1i * sw + x2i)];
-            //q21[0] = src[(y2i * sw + x1i)];
-            //q22[0] = src[(y2i * sw + x2i)];
-            //yp = bilinear(q11[0], q12[0], q21[0], q22[0], x1, y1, x2, y2, x, y);
+            q11 = src[(y1i * sw + x1i)];
+            q12 = src[(y1i * sw + x2i)];
+            q21 = src[(y2i * sw + x1i)];
+            q22 = src[(y2i * sw + x2i)];
+            yp = bilinear(q11, q12, q21, q22, x1, y1, x2, y2, x, y);
 
-            //dst[(j * dw + i)] = yp;
+            dst[(j * dw + i)] = yp;
         }
     }
 }
