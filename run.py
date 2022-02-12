@@ -18,6 +18,10 @@ def execute(cmd):
     print('#'*8, cmd)
     os.system(cmd)
 
+def dump_result(data, tag):
+    filename = '%s\\dump_%s_%dx%d.txt' % (app_dir, tag, data.shape[1], data.shape[0])
+    np.savetxt(filename, data, fmt='%+.18e', delimiter=', ')
+
 def verify_affine():
     # gpu result
     cmd = 'cd %s && %s' % (app_dir, app_name)
@@ -34,9 +38,6 @@ def verify_affine():
     cv2.imwrite('%s\\ref.bmp'%app_dir, b)
 
 def verify_fft():
-    def dump_result(data, tag):
-        filename = '%s\\dump_%s_%dx%d.txt' % (app_dir, tag, data.shape[1], data.shape[0])
-        np.savetxt(filename, data, fmt='%+.18e', delimiter=', ')
     def gaussian2(w, h, sigma=2.0):
         xs, ys = np.meshgrid(np.arange(w), np.arange(h))
         center_x, center_y = w / 2, h / 2
@@ -79,22 +80,13 @@ def verify_preproc():
     # gpu result
     cmd = 'cd %s && %s' % (app_dir, app_name)
     execute(cmd)
-    gpu_cos2d = np.genfromtxt(cos2d_file, dtype=float, delimiter=',')
-    gpu_cos2d = gpu_cos2d[:, :-1]
-    gpu_proc = np.genfromtxt(proc_file, dtype=float, delimiter=',')
-    gpu_proc = gpu_proc[:, :-1]
-    gpu_proc = gpu_proc[:, 0::2] # skip imaginary 
-    # reference result
-    aff = np.fromfile(aff_file, dtype=np.uint8).reshape((h, w))
-    cos2d = cv2.createHanningWindow((w, h), cv2.CV_32F)
-    np.savetxt('%s\\ref.cos2d.txt'%app_dir, cos2d, fmt='%-14.6f', delimiter=', ')
-    print('cos-diff = %f' % np.sum(np.abs(cos2d -gpu_cos2d)))
 
-    ref = np.log(np.float32(aff) + 1.0)
-    ref = (ref - ref.mean()) / (ref.std() + 1e-5)
-    ref = ref * cos2d
-    np.savetxt('%s\\ref.proc.txt'%app_dir, ref, fmt='%-14.6f', delimiter=', ')
-    print('proc-diff = %f' % np.sum(np.abs(ref -gpu_proc)))
+    # reference result
+    yuv = np.fromfile(yuv_file, dtype=np.uint8, count=srcw*srch).reshape((srch, srcw))
+    crop = yuv[y:y+h, x:x+w].astype(np.uint8)
+    crop.tofile('%s\\ref_crop.yuv'%app_dir)
+    norm = np.log(np.float64(crop)+1)
+    dump_result(norm, 'ref_norm')
 
 def yuv_to_image():
     for yuvfile in glob.glob('%s\\dump.*.yuv'%app_dir):
@@ -109,10 +101,9 @@ def find_max():
     print(idx)
 
 # yuv_to_image()
-verify_affine()
+# verify_affine()
 # verify_fft()
-# verify_preproc()
-
+verify_preproc()
 # find_max()
 
 print('done')

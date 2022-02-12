@@ -522,22 +522,27 @@ void test_gpu_gauss2d(size_t w, size_t h)
     clReleaseMemObject(guass2d);
 }
 
-void test_gpu_preproc(size_t width, size_t height)
+void test_gpu_preproc(size_t x, size_t y, size_t w, size_t h)
 {
-    size_t aligned_size = ((width * height + 63) / 64) * 64;
-    uint8_t* d = (uint8_t*)_aligned_malloc(sizeof(uint8_t) * aligned_size, 4096);
-    memset(d, 0, aligned_size);
-    for (size_t i = 0; i < width * height; i++) {
-        d[i] = i % 256;
-    }
-    cl_mem data_in = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(uint8_t) * width * height, d, &err);
+    cl_mem crop_data = clCreateBuffer(context, CL_MEM_WRITE_ONLY, w * h, nullptr, &err);
     CL_CHECK_ERROR(err, "clCreateBuffer");
-    cl_mem data_log = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * width * height, nullptr, &err);
-    CL_CHECK_ERROR(err, "clCreateBuffer");
-    gpu_log(width, height, data_in, data_log);
 
-    clReleaseMemObject(data_in);
-    clReleaseMemObject(data_log);
+    cl_mem proc_dst = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(double) * w * h, nullptr, &err);
+    CL_CHECK_ERROR(err, "clCreateBuffer");
+
+    size_t srcw = 1920, srch = 1080;
+    vector<char> inbuf(srcw * srch, 0);
+    get_frame((char*)inbuf.data(), srcw * srch);
+    //dump2yuv("srcyuv", (uint8_t *)inbuf.data(), w, h, 0);
+
+    gpu_crop_roi((char*)inbuf.data(), srcw, srch, w, h, x, y, crop_data);
+    //dump_clbuf("gpu-crop", crop_data, sizeof(char) * w * h, w, h, 0, false);
+
+    gpu_log(w, h, crop_data, proc_dst);
+    dump_clbuf("gpu-log", crop_data, sizeof(char) * w * h, w, h, 0, false);
+
+    clReleaseMemObject(crop_data);
+    clReleaseMemObject(proc_dst);
 }
 
 void test_gpu_affine(size_t x, size_t y, size_t w, size_t h)
@@ -840,7 +845,7 @@ int main(int argc, char** argv)
 #if 1
     //test_gpu_cos2d(roi.width, roi.height);
     //test_gpu_gauss2d(roi.width, roi.height);
-    test_gpu_preproc(roi.width, roi.height);
+    test_gpu_preproc(roi.x, roi.y, roi.width, roi.height);
     //test_gpu_affine(roi.x, roi.y, roi.width, roi.height);
     //test_gpu_fft(roi.width, roi.height);
 #else
