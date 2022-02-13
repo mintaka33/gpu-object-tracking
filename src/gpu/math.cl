@@ -39,7 +39,7 @@ __kernel void logf(__global uchar *src, __global double *dst, int w, int h) {
   int y = get_global_id(1);
   int i = y * w + x;
 
-  dst[i] = log(((double)src[i]+1) / 255.0);
+  dst[i] = log((double)src[i]+1);
 }
 
 __kernel void crop(__global uchar *src, __global uchar *dst, int srcw, int srch,

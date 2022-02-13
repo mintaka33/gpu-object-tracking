@@ -77,8 +77,10 @@ def verify_fft():
     # print('INFO: [%dx%d] sum of delta = %f, max = %f' % (w, h, np.sum(np.abs(ref - gpu)), np.max(np.abs(ref - gpu))))
 
 def verify_preproc():
+    # x, y, w, h = 0, 0, 4, 4
     # gpu result
-    cmd = 'cd %s && %s' % (app_dir, app_name)
+    args = '%s, %s, %s, %s' % (x, y, w, h)
+    cmd = 'cd %s && %s %s' % (app_dir, app_name, args)
     execute(cmd)
 
     # reference result
